@@ -115,7 +115,13 @@ export default function UmmmLessPanic() {
   const [confirmDelete, setConfirmDelete] = useState<string>("");
   const [deleting, setDeleting] = useState(false);
 
+  const barRef = useRef<HTMLElement | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSave = useRef<{
+    index: number;
+    answer: string;
+    flagged: boolean;
+  } | null>(null);
 
   const loadSheets = useCallback(async () => {
     setLoading(true);
@@ -361,19 +367,58 @@ export default function UmmmLessPanic() {
     setScreen("quiz");
   }
 
+  /* Send whatever is waiting, now. */
+  function sendSave() {
+    const p = pendingSave.current;
+    if (!p || !sheet) return;
+    pendingSave.current = null;
+    void fetch(`/api/sheets/${sheet.id}/answers`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        questionIndex: p.index,
+        answer: p.answer,
+        flagged: p.flagged,
+      }),
+    }).catch(() => {
+      /* typing must not be interrupted by a failed save; the next
+         keystroke tries again and the text is still on screen */
+    });
+  }
+
   function persist(index: number, answer: string, flagged: boolean) {
     if (!sheet) return;
+    /* One timer serves every question, so a save queued for a different
+       question has to go before this one replaces it. Without that, jumping
+       from question 36 to question 12 and typing inside the same second
+       throws away what she wrote on 36. */
+    if (pendingSave.current && pendingSave.current.index !== index) sendSave();
+    pendingSave.current = { index, answer, flagged };
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      void fetch(`/api/sheets/${sheet.id}/answers`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ questionIndex: index, answer, flagged }),
-      }).catch(() => {
-        /* typing must not be interrupted by a failed save; the next
-           keystroke tries again and the text is still on screen */
-      });
-    }, 700);
+    saveTimer.current = setTimeout(sendSave, 700);
+  }
+
+  /* Called before leaving a question, so nothing is in flight while the
+     screen shows a different one. */
+  function flushSave() {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    sendSave();
+  }
+
+  /* Move to another question in the run without judging the one being left:
+     nothing is marked done and nothing is parked. That is what the bar at the
+     top and the previous and next links do. Done and Come back to this, at the
+     bottom, are the ones that record a decision. */
+  function goTo(next: number) {
+    if (next === pos || next < 0 || next >= queue.length) return;
+    flushSave();
+    setPos(next);
+    setHintsShown(0);
+    setOpenPanel("");
+    window.scrollTo({ top: 0 });
   }
 
   function onType(text: string) {
@@ -399,6 +444,7 @@ export default function UmmmLessPanic() {
       }
     }
     setHintsShown(0);
+    flushSave();
     if (pos + 1 >= queue.length) setScreen("end");
     else setPos(pos + 1);
     window.scrollTo({ top: 0 });
@@ -713,28 +759,78 @@ section{margin-bottom:2rem;page-break-inside:avoid}
 
     return (
       <Surface error={error}>
-        <div className="mb-5 flex flex-wrap gap-1">
+        <nav
+          ref={barRef}
+          aria-label="The questions in this run"
+          className="mb-3 flex flex-wrap"
+          onKeyDown={(e) => {
+            const step =
+              e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
+            if (!step) return;
+            e.preventDefault();
+            const next = pos + step;
+            if (next < 0 || next >= queue.length) return;
+            goTo(next);
+            /* Keep the focus on the bar rather than leaving it on a segment
+               that is no longer the current one. */
+            barRef.current?.querySelectorAll("button")[next]?.focus();
+          }}
+        >
           {queue.map((qi, n) => (
-            <span
+            <button
               key={n}
-              className={
-                "h-[3px] w-3.5 rounded-sm " +
+              type="button"
+              /* One tab stop for the whole bar, then the arrow keys, instead
+                 of tabbing through thirty-nine of them to reach the answer. */
+              tabIndex={n === pos ? 0 : -1}
+              aria-current={n === pos ? "step" : undefined}
+              aria-label={
+                `Question ${n + 1} of ${queue.length}` +
                 (n === pos
-                  ? "bg-calm-ink"
+                  ? ", the one you are on"
                   : flags[qi]
-                    ? "bg-calm-plum"
+                    ? ", parked"
                     : done[qi]
-                      ? "bg-calm-moss"
-                      : "bg-calm-line")
+                      ? ", done"
+                      : "")
               }
-            />
+              onClick={() => goTo(n)}
+              className="group cursor-pointer px-0.5 py-2.5 focus:outline-none"
+            >
+              <span
+                className={
+                  "block w-3.5 rounded-sm group-hover:h-1.5 " +
+                  "group-focus-visible:h-1.5 group-focus-visible:bg-calm-plum " +
+                  (n === pos ? "h-1.5 " : "h-[3px] ") +
+                  (n === pos
+                    ? "bg-calm-ink"
+                    : flags[qi]
+                      ? "bg-calm-plum"
+                      : done[qi]
+                        ? "bg-calm-moss"
+                        : "bg-calm-line")
+                }
+              />
+            </button>
           ))}
-        </div>
+        </nav>
 
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-calm-soft text-sm">
-            {pos + 1} of {queue.length}
-          </span>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="flex items-center gap-4">
+            {pos > 0 && (
+              <button onClick={() => goTo(pos - 1)} className={btnBack}>
+                ← the one before
+              </button>
+            )}
+            <span className="text-calm-soft text-sm">
+              {pos + 1} of {queue.length}
+            </span>
+            {pos < queue.length - 1 && (
+              <button onClick={() => goTo(pos + 1)} className={btnBack}>
+                the one after →
+              </button>
+            )}
+          </div>
           <button onClick={() => setScreen("pick")} className={btnBack}>
             stop for now
           </button>
@@ -839,14 +935,7 @@ section{margin-bottom:2rem;page-break-inside:avoid}
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
           {pos > 0 && (
-            <button
-              className={btnBack}
-              onClick={() => {
-                setPos(pos - 1);
-                setHintsShown(0);
-                setOpenPanel("");
-              }}
-            >
+            <button className={btnBack} onClick={() => goTo(pos - 1)}>
               back
             </button>
           )}
