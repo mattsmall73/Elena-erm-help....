@@ -56,21 +56,30 @@ export async function getSheet(id: string) {
   if (sheetRes.rows.length === 0) return null;
 
   const answerRes = await sql`
-    SELECT question_index, answer, flagged
+    SELECT question_index, answer, flagged,
+           (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint AS updated_ms
     FROM revision_answer
     WHERE sheet_id = ${id} AND user_id = ${USER_ID};
   `;
 
   const answers: Record<number, string> = {};
   const flags: Record<number, boolean> = {};
+  // When each answer was last written to, against MarkRow.markedAt, is what
+  // lets "mark everything" tell an answer she has changed since its mark from
+  // one she has not touched. Without it the only options are re-marking work
+  // that has not moved, which spends a call to say the same thing, or never
+  // re-marking a rewrite, which is the whole point of the loop.
+  const answerTimes: Record<number, number> = {};
   for (const row of answerRes.rows) {
-    answers[row.question_index as number] = row.answer as string;
-    if (row.flagged) flags[row.question_index as number] = true;
+    const i = row.question_index as number;
+    answers[i] = row.answer as string;
+    if (row.flagged) flags[i] = true;
+    answerTimes[i] = Number(row.updated_ms);
   }
 
   const marks = await listMarks(id);
 
-  return { sheet: sheetRes.rows[0] as Sheet, answers, flags, marks };
+  return { sheet: sheetRes.rows[0] as Sheet, answers, flags, answerTimes, marks };
 }
 
 /**

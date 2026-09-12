@@ -113,3 +113,115 @@ export function movement(m: {
   if (m.mark === m.previousMark) return null;
   return `was ${m.previousMark}, now ${m.mark}`;
 }
+
+/**
+ * Which answers a "mark everything" run should send.
+ *
+ * Three states, and only the first two cost a call:
+ *
+ *   never marked      -> mark it
+ *   edited since its mark -> mark it, and the movement it shows is real
+ *   marked, untouched -> skip, because the answer for it already exists
+ *
+ * Anything too short to mark is left out here rather than being turned away by
+ * the route, so the count she is shown before it starts is the true one.
+ */
+export function needsMarking(args: {
+  count: number;
+  words: (index: number) => number;
+  minWords: number;
+  markedAt: (index: number) => number | null;
+  answeredAt: (index: number) => number | null;
+}): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < args.count; i++) {
+    if (args.words(i) < args.minWords) continue;
+    const marked = args.markedAt(i);
+    if (marked === null) {
+      out.push(i);
+      continue;
+    }
+    const written = args.answeredAt(i);
+    if (written !== null && written > marked) out.push(i);
+  }
+  return out;
+}
+
+export interface BulkOutcome {
+  /** Answers marked in this run. */
+  marked: number;
+  /** Of those, how many beat the mark they had before. */
+  movedUp: number;
+  /** Words in the answers marked in this run. */
+  words: number;
+  /** Calls that did not come back. */
+  failed: number;
+  /** She pressed stop. */
+  stopped: boolean;
+  /** Questions with nothing written on them yet. */
+  blank: number;
+}
+
+/**
+ * The line shown after a "mark everything" run.
+ *
+ * Facts rather than praise, for the reason the marking prompt itself gives:
+ * generic encouragement is obviously filler, and it makes the real praise
+ * untrustworthy. The word count is the encouraging part, because it is a true
+ * number and it is hers. What is left is named as waiting rather than missed.
+ */
+export function bulkSummary(o: BulkOutcome): string {
+  const parts: string[] = [];
+
+  if (o.marked === 0) {
+    // Three different reasons nothing was marked, and they must not borrow each
+    // other's wording. Saying "everything already has its marking" after a run
+    // where every call failed is both a contradiction and untrue.
+    if (o.stopped) {
+      parts.push("Stopped before anything was marked.");
+    } else if (o.failed > 0) {
+      parts.push(
+        o.failed === 1
+          ? "That one did not come back. Worth trying it again."
+          : "None of them came back. Worth trying again in a minute.",
+      );
+    } else {
+      parts.push("Nothing new to mark. Everything you have written already has its marking.");
+    }
+  } else {
+    const n = o.marked === 1 ? "1 answer marked" : `${o.marked} answers marked`;
+    parts.push(`${n}, ${o.words.toLocaleString("en-GB")} words of your own writing.`);
+  }
+
+  if (o.movedUp > 0) {
+    parts.push(
+      o.marked === 1
+        ? "It scored higher than last time."
+        : o.movedUp === 1
+          ? "One of them scored higher than last time."
+          : `${o.movedUp} of them scored higher than last time.`,
+    );
+  }
+
+  if (o.stopped && o.marked > 0) {
+    parts.push("Stopped there. The rest are still waiting.");
+  }
+
+  if (o.marked > 0 && o.failed > 0) {
+    parts.push(
+      o.failed === 1
+        ? "One did not come back. Worth trying that one again."
+        : `${o.failed} did not come back. Worth trying those again.`,
+    );
+  }
+
+  if (o.blank > 0) {
+    parts.push(
+      o.blank === 1
+        ? "One question is still blank, there whenever you want it."
+        : `${o.blank} questions are still blank, there whenever you want them.`,
+    );
+  }
+
+  return parts.join(" ");
+}

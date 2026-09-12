@@ -6,9 +6,11 @@ import { readResponse } from "@/lib/safe-json";
 import { SEED_SHEET } from "@/lib/seed-sheet";
 import {
   GRADE_MIN_MARKED,
+  bulkSummary,
   gradeLabel,
   markLine,
   movement,
+  needsMarking,
   runningGrade,
   type StoredMark,
 } from "@/lib/marking";
@@ -21,6 +23,22 @@ const BATCH = 4; // questions sent to the model at a time
    with no counter and no message, because a locked hint on a bad day means the
    app gets closed, which costs more than a copied sentence. */
 const HINT_WORD_THRESHOLD = 20;
+
+/* Matches MIN_WORDS in the mark route. Checked here so an answer too short to
+   mark is never counted in a "mark everything" total and never costs a call
+   only to be turned away. */
+const MARK_MIN_WORDS = 15;
+
+/* Marks in flight at once during a "mark everything" run. Two rather than one
+   halves a long wait, and rather than more because each call is a whole
+   marking at high effort and there is nothing to gain by queueing them up at
+   the other end. */
+const MARK_ALL_CONCURRENCY = 2;
+
+const countWords = (text: string): number => {
+  const t = text.trim();
+  return t ? t.split(/\s+/).length : 0;
+};
 
 type Screen = "sheets" | "create" | "pick" | "quiz" | "end";
 
@@ -45,6 +63,8 @@ interface Feedback {
 
 interface MarkRecord extends StoredMark {
   feedback: Feedback;
+  /** Epoch ms. Absent on a mark made in this session before any reload. */
+  markedAt?: number;
 }
 
 /* Tailwind class groups, named once so the markup below stays readable. */
@@ -110,12 +130,18 @@ export default function UmmmLessPanic() {
   const [seeding, setSeeding] = useState(false);
   const [seedNote, setSeedNote] = useState("");
   const [marks, setMarks] = useState<Record<number, MarkRecord>>({});
+  const [answerTimes, setAnswerTimes] = useState<Record<number, number>>({});
   const [marking, setMarking] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
+  const [markAllDone, setMarkAllDone] = useState(0);
+  const [markAllTotal, setMarkAllTotal] = useState(0);
+  const [markAllNote, setMarkAllNote] = useState("");
   const [openPanel, setOpenPanel] = useState<string>("");
   const [confirmDelete, setConfirmDelete] = useState<string>("");
   const [deleting, setDeleting] = useState(false);
 
   const barRef = useRef<HTMLElement | null>(null);
+  const stopMarkAll = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSave = useRef<{
     index: number;
@@ -219,6 +245,7 @@ export default function UmmmLessPanic() {
       sheet: Sheet;
       answers: Record<number, string>;
       flags: Record<number, boolean>;
+      answerTimes?: Record<number, number>;
       marks?: MarkRecord[];
     }>(res);
 
@@ -226,11 +253,13 @@ export default function UmmmLessPanic() {
       setSheet(out.data.sheet);
       setAnswers(out.data.answers);
       setFlags(out.data.flags);
+      setAnswerTimes(out.data.answerTimes ?? {});
       const byIndex: Record<number, MarkRecord> = {};
       for (const m of out.data.marks ?? []) byIndex[m.questionIndex] = m;
       setMarks(byIndex);
       setDone({});
       setError("");
+      setMarkAllNote("");
       setScreen("pick");
     } else {
       setError(out.error);
@@ -242,11 +271,14 @@ export default function UmmmLessPanic() {
      of writing, and she can mark a single answer without starting a session.
      The running grade is worked out in code from the stored levels, so the
      marker is never asked to estimate one and never sees another answer. */
-  async function markAnswer(idx: number) {
-    if (!sheet || marking) return;
-    setMarking(true);
-    setError("");
-    setOpenPanel("");
+  /* Marks one answer and stores it. Returns the record so a caller can count
+     what moved, or the error so a caller can decide whether to show it. A run
+     of thirty of these must not flash a message per failure, which is why the
+     error is returned rather than set here. */
+  async function requestMark(
+    idx: number,
+  ): Promise<{ ok: true; record: MarkRecord } | { ok: false; error: string }> {
+    if (!sheet) return { ok: false, error: "No sheet open." };
     try {
       const res = await fetch(`/api/sheets/${sheet.id}/mark`, {
         method: "POST",
@@ -254,29 +286,120 @@ export default function UmmmLessPanic() {
         body: JSON.stringify({ questionIndex: idx }),
       });
       const out = await readResponse<Feedback>(res);
-      if (!out.ok) {
-        setError(out.error);
-        return;
-      }
+      if (!out.ok) return { ok: false, error: out.error };
+
       const fb = out.data;
-      setMarks((prev) => ({
-        ...prev,
-        [idx]: {
-          questionIndex: idx,
-          mark: fb.mark ?? null,
-          maxMark: fb.maxMark ?? null,
-          level: fb.level ?? null,
-          maxLevel: fb.maxLevel ?? null,
-          previousMark: fb.previousMark ?? null,
-          previousLevel: fb.previousLevel ?? null,
-          feedback: fb,
-        },
-      }));
+      const record: MarkRecord = {
+        questionIndex: idx,
+        mark: fb.mark ?? null,
+        maxMark: fb.maxMark ?? null,
+        level: fb.level ?? null,
+        maxLevel: fb.maxLevel ?? null,
+        previousMark: fb.previousMark ?? null,
+        previousLevel: fb.previousLevel ?? null,
+        markedAt: Date.now(),
+        feedback: fb,
+      };
+      setMarks((prev) => ({ ...prev, [idx]: record }));
+      return { ok: true, record };
     } catch {
-      setError("Couldn't reach the marker. Check your connection?");
-    } finally {
-      setMarking(false);
+      return { ok: false, error: "Couldn't reach the marker. Check your connection?" };
     }
+  }
+
+  async function markAnswer(idx: number) {
+    if (!sheet || marking || markingAll) return;
+    setMarking(true);
+    setError("");
+    setOpenPanel("");
+    const out = await requestMark(idx);
+    if (!out.ok) setError(out.error);
+    setMarking(false);
+  }
+
+  /* Everything she has written, and nothing she has not.
+     Deliberately skips an answer that already has a mark and has not been
+     touched since: that mark is already on screen, and re-running it would
+     spend a call to say the same thing while the movement line credited her
+     with a rise she did not write. */
+  function markableNow(): number[] {
+    if (!sheet) return [];
+    return needsMarking({
+      count: sheet.questions.length,
+      words: (i) => countWords(answers[i] ?? ""),
+      minWords: MARK_MIN_WORDS,
+      markedAt: (i) => marks[i]?.markedAt ?? (marks[i] ? 0 : null),
+      answeredAt: (i) => answerTimes[i] ?? null,
+    });
+  }
+
+  /* Marks the lot, a couple at a time, landing each result as it arrives so
+     the page fills in rather than sitting blank. Stoppable, because a run of
+     thirty is minutes long and nothing about it should feel like a commitment. */
+  async function markEverything() {
+    if (!sheet || marking || markingAll) return;
+
+    const queued = markableNow();
+    const blank = sheet.questions.filter(
+      (_, i) => countWords(answers[i] ?? "") < MARK_MIN_WORDS,
+    ).length;
+
+    if (queued.length === 0) {
+      setMarkAllNote(
+        bulkSummary({ marked: 0, movedUp: 0, words: 0, failed: 0, stopped: false, blank }),
+      );
+      return;
+    }
+
+    stopMarkAll.current = false;
+    setError("");
+    setMarkAllNote("");
+    setMarkingAll(true);
+    setMarkAllDone(0);
+    setMarkAllTotal(queued.length);
+
+    const pending = [...queued];
+    let marked = 0;
+    let movedUp = 0;
+    let words = 0;
+    let failed = 0;
+    let finished = 0;
+    let lastError = "";
+
+    const worker = async () => {
+      for (;;) {
+        if (stopMarkAll.current) return;
+        const idx = pending.shift();
+        if (idx === undefined) return;
+
+        const out = await requestMark(idx);
+        if (out.ok && out.record.feedback.status === "marked") {
+          marked += 1;
+          words += countWords(answers[idx] ?? "");
+          const { mark, previousMark } = out.record;
+          if (typeof mark === "number" && typeof previousMark === "number" && mark > previousMark) {
+            movedUp += 1;
+          }
+        } else if (!out.ok) {
+          failed += 1;
+          lastError = out.error;
+        }
+        finished += 1;
+        setMarkAllDone(finished);
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(MARK_ALL_CONCURRENCY, queued.length) }, worker),
+    );
+
+    setMarkingAll(false);
+    setMarkAllNote(
+      bulkSummary({ marked, movedUp, words, failed, stopped: stopMarkAll.current, blank }),
+    );
+    // One message for the whole run, and only when nothing at all came back,
+    // so a single dropped call does not read as a broken app.
+    if (marked === 0 && failed > 0) setError(lastError);
   }
 
   async function buildSheet() {
@@ -424,6 +547,11 @@ export default function UmmmLessPanic() {
   function onType(text: string) {
     const idx = queue[pos];
     setAnswers((a) => ({ ...a, [idx]: text }));
+    // Stamped here rather than read back from the server, so an answer she
+    // rewrites and then marks-everything in the same sitting is seen as newer
+    // than its mark. The server sets the real value; this only has to be later
+    // than the mark it is compared against.
+    setAnswerTimes((t) => ({ ...t, [idx]: Date.now() }));
     persist(idx, text, !!flags[idx]);
   }
 
@@ -734,6 +862,19 @@ section{margin-bottom:2rem;page-break-inside:avoid}
 
         <GradeStrip grade={grade} marked={Object.keys(marks).length} />
 
+        <MarkAllPanel
+          ready={markableNow().length}
+          running={markingAll}
+          done={markAllDone}
+          total={markAllTotal}
+          note={markAllNote}
+          busy={marking}
+          onStart={() => void markEverything()}
+          onStop={() => {
+            stopMarkAll.current = true;
+          }}
+        />
+
         <div className="border-calm-line border-t">
           <Choice n={3} t="Three to start" d="Picked at random. Enough to prove the day is not a write-off." onClick={() => startRun("three")} />
           {unanswered > 0 && (
@@ -909,7 +1050,7 @@ section{margin-bottom:2rem;page-break-inside:avoid}
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
             className={btnQuiet}
-            disabled={marking || words < 15}
+            disabled={marking || markingAll || words < 15}
             onClick={() => void markAnswer(idx)}
             title={
               words < 15
@@ -980,6 +1121,19 @@ section{margin-bottom:2rem;page-break-inside:avoid}
         </p>
 
         <GradeStrip grade={grade} marked={Object.keys(marks).length} />
+
+        <MarkAllPanel
+          ready={markableNow().length}
+          running={markingAll}
+          done={markAllDone}
+          total={markAllTotal}
+          note={markAllNote}
+          busy={marking}
+          onStart={() => void markEverything()}
+          onStop={() => {
+            stopMarkAll.current = true;
+          }}
+        />
 
         {flaggedNow.length > 0 && (
           <ul className="font-read mb-6 list-disc pl-5">
@@ -1055,6 +1209,64 @@ section{margin-bottom:2rem;page-break-inside:avoid}
  * based on when it does, so the sample size is never hidden. While it is
  * building it says so, which is more use than silence.
  */
+/* Mark everything she has written, in one press.
+   Lives on the sheet screen and again at the end of a run, and is always on
+   screen rather than only when there is something to mark: a control that
+   appears and disappears is one she has to go looking for, and the reason it
+   is unavailable is worth more than its absence. */
+function MarkAllPanel({
+  ready,
+  running,
+  done,
+  total,
+  note,
+  busy,
+  onStart,
+  onStop,
+}: {
+  ready: number;
+  running: boolean;
+  done: number;
+  total: number;
+  note: string;
+  busy: boolean;
+  onStart: () => void;
+  onStop: () => void;
+}) {
+  return (
+    <div className="border-calm-line mb-6 border-t pt-5">
+      {running ? (
+        <>
+          <p className="font-read text-calm-ink">
+            Marking {Math.min(done + 1, total)} of {total}.
+          </p>
+          <p className="text-calm-soft mt-1 text-sm">
+            Each one is a whole marking, so this takes a few minutes. They appear
+            as they land, and you can stop whenever you like.
+          </p>
+          <button onClick={onStop} className={btnBack + " mt-3"}>
+            stop
+          </button>
+        </>
+      ) : (
+        <>
+          <button className={btnQuiet} disabled={ready === 0 || busy} onClick={onStart}>
+            Mark everything I have written
+          </button>
+          <p className="text-calm-soft mt-2 text-sm">
+            {ready === 0
+              ? "Everything you have written already has its marking."
+              : ready === 1
+                ? "One answer is ready. Anything still blank is skipped."
+                : `${ready} answers are ready. Anything still blank is skipped.`}
+          </p>
+        </>
+      )}
+      {note && <p className="font-read text-calm-ink mt-4">{note}</p>}
+    </div>
+  );
+}
+
 function GradeStrip({
   grade,
   marked,
