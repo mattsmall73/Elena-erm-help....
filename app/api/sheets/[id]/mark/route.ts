@@ -433,6 +433,21 @@ export const POST = withSession<{ params: Promise<{ id: string }> }>(
           { status: 502 },
         );
       }
+      // Marking has its own table, added after the first two. If it is not
+      // there yet, say so plainly rather than reporting a fault.
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        (err as { code?: unknown }).code === "42P01"
+      ) {
+        console.error(
+          "[mark] revision_mark is missing. Run scripts/schema.sql to create it.",
+        );
+        return Response.json(
+          { error: "Marking isn't switched on here yet." },
+          { status: 503 },
+        );
+      }
       console.error("[mark] failed:", err);
       return Response.json(
         { error: "Something went wrong at our end. Try that again." },

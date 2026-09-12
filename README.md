@@ -169,8 +169,14 @@ Three tables of its own, `revision_sheet`, `revision_answer` and
 **Setting it up needs no terminal.** Two steps:
 
 1. Paste `scripts/schema.sql` into the Neon console SQL editor and run it. It
-   creates both tables and prints them back so you can see it worked. Safe to
-   run again; every statement is guarded.
+   creates all three tables and prints them back so you can see it worked.
+   Safe to run again; every statement is guarded.
+
+   **Run it again after any update that adds a table.** `revision_mark`
+   arrived after the first two, and a database without it cannot store marks.
+   Opening a sheet still works in that state and the server log says what to
+   run, so a missed migration degrades rather than breaking, but marking stays
+   off until the table exists.
 2. Open `/ummm-less-panic` and press **Load the history sheet**. The 39
    questions ship as a static file and go in through the same route a
    hand-built sheet uses, so they are validated on the way like anything else.

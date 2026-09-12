@@ -182,6 +182,22 @@ export async function saveAnswer(
   `;
 }
 
+/**
+ * Postgres "relation does not exist".
+ *
+ * revision_mark arrived after the first two tables, so a database created
+ * before it exists is a real state to be in rather than a broken one. Opening
+ * a sheet used to throw here, which took the whole app down for the sake of a
+ * feature that had not been set up yet.
+ */
+function isMissingTable(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: unknown }).code === "42P01"
+  );
+}
+
 export interface MarkRow extends StoredMark {
   feedback: unknown;
   markedAt: number;
@@ -189,6 +205,21 @@ export interface MarkRow extends StoredMark {
 
 /** Every mark on a sheet, for the running grade and for showing past feedback. */
 export async function listMarks(sheetId: string): Promise<MarkRow[]> {
+  try {
+    return await queryMarks(sheetId);
+  } catch (err) {
+    if (isMissingTable(err)) {
+      console.error(
+        "[revision-db] revision_mark is missing, so marks are unavailable. " +
+          "Run scripts/schema.sql to create it. Opening sheets still works.",
+      );
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function queryMarks(sheetId: string): Promise<MarkRow[]> {
   const res = await sql`
     SELECT question_index, mark, max_mark, level, max_level,
            previous_mark, previous_level, feedback,
