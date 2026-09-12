@@ -11,13 +11,19 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const MODEL = "claude-opus-5";
+const MODEL = "claude-opus-4-8";
 
 /**
  * Marking is judgement, and the prompt is explicit that an inflated mark
  * removes the information she is asking for, so this runs at high effort
  * rather than the medium the sheet builder uses. One answer per request keeps
  * the response short enough that the ceiling is never the constraint.
+ *
+ * The `thinking: { type: "adaptive" }` on the call below is load-bearing on
+ * this model and must not be dropped. Opus 4.8 runs with no thinking at all
+ * when the parameter is absent, where Opus 5 thinks by default. Removing it
+ * as redundant would quietly turn the reasoning off on the one route in this
+ * repo where the judgement is the product.
  */
 const MAX_TOKENS = 8000;
 const EFFORT = "high" as const;
