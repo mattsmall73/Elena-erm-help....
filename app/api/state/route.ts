@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getState, saveState, isDbConfigured } from "@/lib/db";
-import type { ProfileState } from "@/lib/types";
+import { validateProfileState } from "@/lib/validate-profile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,14 +24,24 @@ export async function POST(req: Request) {
   if (!isDbConfigured()) {
     return NextResponse.json({ error: "no-db" }, { status: 503 });
   }
-  let state: ProfileState;
+  let raw: unknown;
   try {
-    state = (await req.json()) as ProfileState;
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: "bad-json" }, { status: 400 });
   }
+
+  // saveState clears rows before writing the replacements, so a body that
+  // cannot be trusted must be turned away before it reaches that. Validation
+  // also strips unrecognised fields, which matters because a deck is stored
+  // whole in a JSONB column.
+  const parsed = validateProfileState(raw);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.reason }, { status: 400 });
+  }
+
   try {
-    await saveState(state);
+    await saveState(parsed.state);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "db-error" }, { status: 503 });
