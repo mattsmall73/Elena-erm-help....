@@ -157,10 +157,20 @@ Forgetful Doodle uses is touched.
    creates both tables and prints them back so you can see it worked. Safe to
    run again; every statement is guarded.
 2. Open `/ummm-less-panic` and press **Load the history sheet**. The 39
-   questions ship as a static file and go in through the same create route a
+   questions ship as a static file and go in through the same route a
    hand-built sheet uses, so they are validated on the way like anything else.
-   The button only appears while there are no sheets, so it cannot be pressed
-   twice by accident.
+
+Once it is loaded, the same control reads **bring the history sheet up to
+date** and stays available. Pressing it again updates that sheet in place:
+the hints are refreshed and her answers are untouched, because nothing is
+deleted and `created_at` is left alone. That is the operation to use every
+time a sheet is improved, and it is why there is no delete control.
+
+Matching runs on the sheet's id first, then on its title. The title step is
+there because a sheet loaded before ids were fixed carries a generated id with
+a random suffix that nothing can predict. It only acts on an unambiguous single
+match, and only for the shipped sheet, since a sheet built by hand never sends
+an id and is always created fresh.
 
 `revision_answer.sheet_id` references the sheet and cascades on delete, so
 answers cannot outlive the sheet they belong to and a sheet id that does not

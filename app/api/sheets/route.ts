@@ -1,4 +1,4 @@
-import { listSheets, createSheet } from "@/lib/revision-db";
+import { listSheets, createSheet, upsertSeededSheet } from "@/lib/revision-db";
 import { validateSheet } from "@/lib/validate-questions";
 import { withSession } from "@/lib/session";
 
@@ -28,8 +28,20 @@ export const POST = withSession(async (request) => {
       return Response.json({ error: parsed.reason }, { status: 400 });
     }
 
+    // A posted id means the shipped sheet, which updates in place rather than
+    // duplicating. Everything she builds herself takes a generated id.
+    if (parsed.id) {
+      const res = await upsertSeededSheet(
+        parsed.id,
+        parsed.title,
+        parsed.subject,
+        parsed.questions,
+      );
+      return Response.json(res);
+    }
+
     const id = await createSheet(parsed.title, parsed.subject, parsed.questions);
-    return Response.json({ id });
+    return Response.json({ id, created: true });
   } catch (err) {
     // The message stays server-side. A Postgres error names tables, columns
     // and sometimes the connection, and this reached the browser verbatim.

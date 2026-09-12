@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { readResponse } from "@/lib/safe-json";
+import { SEED_SHEET } from "@/lib/seed-sheet";
 import type { Question, Sheet, SheetSummary } from "@/lib/revision-db";
 
 const BATCH = 4; // questions sent to the model at a time
@@ -76,6 +77,7 @@ export default function UmmmLessPanic() {
   const [progress, setProgress] = useState("");
   const [pupilName, setPupilName] = useState("");
   const [seeding, setSeeding] = useState(false);
+  const [seedNote, setSeedNote] = useState("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -92,16 +94,19 @@ export default function UmmmLessPanic() {
     setLoading(false);
   }, []);
 
-  /* Sets up the history sheet without a terminal: the questions ship as a
-     static file and go in through the same create route a hand-built sheet
-     uses, so they are validated on the way like anything else. Only offered
-     while there are no sheets, so it cannot be pressed twice by accident. */
+  /* Loads or refreshes the history sheet without a terminal. The questions
+     ship as a static file and go in through the same route a hand-built sheet
+     uses, so they are validated on the way like anything else. Pressing it
+     again updates the sheet in place and leaves her answers alone, which is
+     what makes it safe to offer once the sheet already exists. */
   const loadHistorySheet = useCallback(async () => {
     setSeeding(true);
     setError("");
+    setSeedNote("");
     try {
-      const fileRes = await fetch("/richard-and-john.json", { cache: "no-store" });
+      const fileRes = await fetch(SEED_SHEET.path, { cache: "no-store" });
       const file = await readResponse<{
+        id: string;
         title: string;
         subject: string;
         questions: Question[];
@@ -116,12 +121,17 @@ export default function UmmmLessPanic() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(file.data),
       });
-      const saved = await readResponse<{ id: string }>(saveRes);
+      const saved = await readResponse<{ id: string; created: boolean }>(saveRes);
       if (!saved.ok) {
         setError(saved.error);
         return;
       }
 
+      setSeedNote(
+        saved.data.created
+          ? "History sheet loaded."
+          : "History sheet brought up to date. Your answers are still there.",
+      );
       await loadSheets();
     } catch {
       setError("Couldn't load the history sheet. Check your connection?");
@@ -351,6 +361,10 @@ section{margin-bottom:2rem;page-break-inside:avoid}
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
+  const hasSeedSheet = sheets.some(
+    (s) => s.id === SEED_SHEET.id || s.title === SEED_SHEET.title,
+  );
+
   const h1 = "font-read mb-4 text-3xl leading-tight font-normal sm:text-4xl";
   const lede = "text-calm-soft mb-6 max-w-lg";
 
@@ -408,6 +422,33 @@ section{margin-bottom:2rem;page-break-inside:avoid}
         >
           Make a new sheet
         </button>
+
+        {seedNote && (
+          <p className="text-calm-moss mt-4 text-sm" role="status">
+            {seedNote}
+          </p>
+        )}
+
+        {/* Shown whenever there is at least one sheet, so the history sheet is
+            still reachable if she made her own first. The empty state has its
+            own copy of this with the explanation. */}
+        {!loading && sheets.length > 0 && (
+          <p className="mt-6">
+            <button
+              className={btnBack}
+              disabled={seeding}
+              onClick={() => void loadHistorySheet()}
+            >
+              {seeding
+                ? hasSeedSheet
+                  ? "bringing it up to date…"
+                  : "loading it in…"
+                : hasSeedSheet
+                  ? "bring the history sheet up to date"
+                  : "load the history sheet"}
+            </button>
+          </p>
+        )}
       </Surface>
     );
   }

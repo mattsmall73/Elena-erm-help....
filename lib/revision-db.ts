@@ -70,6 +70,77 @@ export async function getSheet(id: string) {
   return { sheet: sheetRes.rows[0] as Sheet, answers, flags };
 }
 
+/**
+ * Write the shipped sheet, updating it in place if it is already there.
+ *
+ * Answers are never touched. That is the point: a sheet gets improved, the
+ * hints are refreshed, and anything she has written against it survives,
+ * which a delete and reload cannot offer.
+ *
+ * Matching runs id first, then title. The title step exists because the sheet
+ * loaded before ids were fixed has a generated id with a random suffix that
+ * nothing can predict, so an id-only match would make a second copy of it and
+ * there is no delete control to clear up with. It is confined to the seed path,
+ * since a sheet built by hand never sends an id, and it only acts on an
+ * unambiguous single match. When it matches, the row keeps its own id, so its
+ * answers stay attached.
+ */
+export async function upsertSeededSheet(
+  id: string,
+  title: string,
+  subject: string,
+  questions: Question[],
+): Promise<{ id: string; created: boolean }> {
+  const json = JSON.stringify(questions);
+
+  // created_at is deliberately absent from every SET below, so an update keeps
+  // the date the sheet first appeared.
+  const byId = await sql`
+    UPDATE revision_sheet
+    SET title = ${title}, subject = ${subject}, questions = ${json}::jsonb
+    WHERE id = ${id} AND user_id = ${USER_ID}
+    RETURNING id;
+  `;
+  if (byId.rowCount === 1) return { id, created: false };
+
+  const byTitle = await sql`
+    UPDATE revision_sheet
+    SET subject = ${subject}, questions = ${json}::jsonb
+    WHERE user_id = ${USER_ID}
+      AND title = ${title}
+      AND (SELECT COUNT(*) FROM revision_sheet
+           WHERE user_id = ${USER_ID} AND title = ${title}) = 1
+    RETURNING id;
+  `;
+  if (byTitle.rowCount === 1) {
+    return { id: byTitle.rows[0].id as string, created: false };
+  }
+
+  // ON CONFLICT so two quick presses cannot turn into a primary key error.
+  //
+  // The user_id guard matters: the primary key is the id alone, so without it
+  // a conflict would update whichever profile owns that id. Tested, and it
+  // did exactly that before the guard was here. Nothing can reach this with a
+  // different owner today, since there is one profile, and the cost of being
+  // wrong later is writing over someone else's sheet.
+  const inserted = await sql`
+    INSERT INTO revision_sheet (id, user_id, title, subject, questions)
+    VALUES (${id}, ${USER_ID}, ${title}, ${subject}, ${json}::jsonb)
+    ON CONFLICT (id) DO UPDATE SET
+      title = EXCLUDED.title,
+      subject = EXCLUDED.subject,
+      questions = EXCLUDED.questions
+    WHERE revision_sheet.user_id = EXCLUDED.user_id
+    RETURNING id;
+  `;
+  if (inserted.rowCount !== 1) {
+    // The id exists and belongs to another profile, so the guard refused it.
+    // Step one already ruled out this profile owning it.
+    throw new Error(`Sheet id ${id} belongs to another profile.`);
+  }
+  return { id, created: true };
+}
+
 export async function createSheet(
   title: string,
   subject: string,
