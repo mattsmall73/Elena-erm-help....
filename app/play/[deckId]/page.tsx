@@ -39,7 +39,7 @@ export default function PlayPage() {
           That deck isn&rsquo;t ready to play yet.
         </p>
         <Link
-          href="/"
+          href="/forgetful-doodle"
           className="text-cyan hover:text-glow-cyan text-sm transition-colors"
         >
           ← Back to the arcade

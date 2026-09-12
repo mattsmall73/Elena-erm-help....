@@ -32,7 +32,7 @@ export function proxy(request: NextRequest) {
   // An API caller wants a status code, not a login page.
   if (pathname.startsWith("/api/")) {
     return NextResponse.json(
-      { error: "locked", message: "Enter the passcode to continue." },
+      { error: "Enter the passcode to continue.", code: "locked" },
       { status: 401 },
     );
   }

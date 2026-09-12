@@ -1,0 +1,722 @@
+{
+  "title": "Richard and John, 1189 to 1216",
+  "subject": "History",
+  "questions": [
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of knight service between 1189 and 1216.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Land held from a lord in return for military service. The unit was a knight's fee.",
+        "Usually forty days of unpaid service a year.",
+        "Barons owed the king a fixed quota of knights.",
+        "Scutage was money paid instead of turning up."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of labour service between 1189 and 1216.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Villeins worked the lord's own land, the demesne, for two or three days a week.",
+        "Extra boon work was owed at busy times such as harvest.",
+        "Villeins were unfree. They could not leave the manor or marry off a daughter without the lord's permission and a payment."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of agricultural life between 1189 and 1216.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Open fields divided into strips, shared out so nobody held all the good soil.",
+        "Three field rotation with one field left fallow each year to recover.",
+        "The year ran on the harvest. A bad one meant hunger, not inconvenience.",
+        "Almost everyone was a peasant working land belonging to a manor."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of life in towns between 1189 and 1216.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Towns grew around markets and trade routes, and paid the king for a charter.",
+        "A charter bought freedom from some manorial dues and the right to run their own courts and markets.",
+        "Guilds controlled who could trade, the quality of goods and the price.",
+        "A villein who lived in a town for a year and a day could become free.",
+        "Crowded, dirty, timber built, and prone to fire and disease."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of the role of a priest between 1189 and 1216.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Performed the sacraments: baptism, marriage, mass, confession, last rites.",
+        "Controlled the things people believed would shorten their time in purgatory.",
+        "Collected tithes, a tenth of what people produced.",
+        "Often local and poorly educated, sometimes reciting Latin he did not fully understand."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of the coronation ceremony for a medieval monarch.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Held at Westminster Abbey and led by the Archbishop of Canterbury.",
+        "Anointing with holy oil, which marked the king as chosen by God and very hard to undo.",
+        "The coronation oath: protect the Church, keep the peace, and give justice to all.",
+        "Crown, orb and sceptre handed over, then a great feast. Richard was crowned in September 1189."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of the role of a sheriff between 1189 and 1216.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "The king's chief official in a county.",
+        "Collected royal money and answered to the Exchequer for a fixed sum called the county farm.",
+        "Ran the shire court, arrested criminals, raised men when needed.",
+        "Widely disliked. Many took more than they were owed, which is why Magna Carta has clauses about them."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of Chateau Gaillard.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Built by Richard between 1196 and 1198 on a cliff above the Seine at Les Andelys.",
+        "Built in roughly two years at enormous cost, to block Philip's route to Rouen.",
+        "Concentric design: rings of walls, so taking the outer one gained you very little.",
+        "Fell to Philip in 1204 after a long siege, with no relief force sent by John."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of the pogroms of 1189–90 against the Jewish population in England.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "They began at Richard's coronation in September 1189, when Jews who came with gifts were attacked in London.",
+        "Attacks spread through 1190 to Norwich, Stamford, Lynn and York.",
+        "At York in March 1190, around 150 people sheltered in Clifford's Tower and died there, many taking their own lives.",
+        "Records of debts owed to Jewish moneylenders were burned at York Minster."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of royal revenues during the reigns of King Richard I and King John.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Feudal dues: scutage, reliefs paid on inheritance, and money from wardships and marriages.",
+        "Tallage, a tax on towns and on the Jewish community.",
+        "Sale of offices, charters and privileges. Richard joked he would sell London if he could find a buyer.",
+        "Fines under forest law, and Richard's ransom of 150,000 marks raised in 1193 to 1194."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of Magna Carta.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Sealed at Runnymede in June 1215 by John, under pressure from rebel barons.",
+        "63 clauses, most of them about barons' money and rights rather than ordinary people.",
+        "No free man to be imprisoned or stripped of property except by the lawful judgement of his equals or the law of the land.",
+        "Justice not to be sold, refused or delayed. No scutage without common consent.",
+        "A council of 25 barons to hold the king to it. The Pope annulled it within ten weeks."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of the Interdict.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Imposed by Pope Innocent III in March 1208 after John refused to accept Stephen Langton as Archbishop of Canterbury.",
+        "Church services stopped. No marriages in church, no burial in consecrated ground.",
+        "Baptism of babies and confession for the dying were still allowed.",
+        "John seized Church land and pocketed the income, so it cost him little and frightened his people a great deal."
+      ]
+    },
+    {
+      "type": "short",
+      "label": "Describe one feature (4 marks)",
+      "prompt": "Describe one feature of the siege of Rochester in 1215.",
+      "given": "",
+      "shape": [
+        "One sentence naming the feature.",
+        "One sentence of detail or an example that shows you know it."
+      ],
+      "hints": [
+        "Rebel barons held Rochester Castle against John from October 1215.",
+        "John's men mined under the south east corner of the keep and fired the props using the fat of forty pigs.",
+        "The corner tower collapsed. The garrison fought on behind the cross wall.",
+        "They surrendered after about seven weeks, starving. The corner was later rebuilt round."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why there were anti-Jewish pogroms in 1189–90.",
+      "given": "You may use: the Crusades, events at Richard's coronation. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Crusade preaching framed non-Christians as enemies, and that hostility did not stay in the Holy Land.",
+        "Christians were barred from lending at interest, so Jewish moneylenders held the debts of knights and gentry. Destroying the records destroyed the debt.",
+        "Rumour at the coronation that Richard had ordered an attack, after Jews bringing gifts were turned away and beaten.",
+        "Jews were under royal protection and taxed heavily by the king, which made them resented as the king's property.",
+        "York was led by indebted local men including Richard Malebisse, and Richard was abroad and unable to stop it."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why religion was so important to people living between 1189 and 1216.",
+      "given": "You may use: purgatory, the role of the priest. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Heaven, hell and purgatory were treated as facts. Time in purgatory could be shortened by confession, masses, pilgrimage and giving to the Church.",
+        "The priest controlled access to the sacraments, so he controlled the route to salvation.",
+        "The Church explained things nothing else explained: illness, bad harvests, sudden death.",
+        "Excommunication and the Interdict were terrifying because they cut people off from that route.",
+        "Church buildings and feast days were the shape of the village year and its social life."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain the main duties of a medieval monarch.",
+      "given": "You may use: knight, manager. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Warrior: lead armies, defend the kingdom and hold the lands in France.",
+        "Manager: raise money, run the Exchequer, appoint and control sheriffs and officials.",
+        "Lawgiver: provide justice through the royal courts and keep order.",
+        "Keep the barons loyal through land, patronage and marriages, or face rebellion.",
+        "Protect the Church and keep the coronation oath he swore before God."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why Richard and John had to raise taxes.",
+      "given": "You may use: the Third Crusade, lands in France. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "The Third Crusade meant ships, mercenaries, food and equipment for a huge force, paid up front.",
+        "Richard's ransom of 150,000 marks after his capture on the way home.",
+        "Defending and recovering Normandy: mercenaries, allies bought with cash, and castles like Chateau Gaillard.",
+        "Losing Normandy in 1204 cut John's income and he still needed money to win it back.",
+        "Prices were rising, so the same tax bought less. Hence repeated scutage and the thirteenth of 1207."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why Richard I joined the Third Crusade.",
+      "given": "You may use: religious devotion, personal glory.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Saladin captured Jerusalem in 1187 and the Pope called for a crusade.",
+        "Crusaders were promised forgiveness of sins, which mattered to a man who expected to be judged.",
+        "Reputation. Richard was a soldier first, and a crusade was the largest stage available.",
+        "He had taken the cross before he was king, and going back on it would have shamed him.",
+        "Rivalry with Philip II of France, who was also going."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why Richard and his fellow crusaders failed to recapture Jerusalem.",
+      "given": "You may use: Richard's quarrel with Phillip, Saladin's strengths as a leader. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Philip went home in 1191 and took his troops, and Richard also fell out with Duke Leopold of Austria.",
+        "Saladin held the wells and destroyed crops around Jerusalem, so a besieging army could not feed itself.",
+        "Saladin avoided open battle after his defeat at Arsuf and let distance and heat do the work.",
+        "Even if taken, Jerusalem could not be held once the crusaders sailed home.",
+        "News that John and Philip were plotting in his lands forced Richard to leave. He came within sight of the city twice and turned back."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why people from England joined the Third Crusade.",
+      "given": "You may use: religion, rewards. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Forgiveness of sins and a shorter stay in purgatory, preached hard by the Church.",
+        "Plunder, land and wages for those who survived.",
+        "Obligation. When a lord took the cross his household and tenants were expected to follow.",
+        "Crusaders' property and debts were protected while they were away.",
+        "Status and adventure. A returning crusader was somebody."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why Normandy was so important to Richard, John and Phillip.",
+      "given": "You may use: barons, alliances. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "It was the ancestral homeland of the English royal family since 1066. Losing it was a personal humiliation.",
+        "Many barons held land on both sides of the Channel, so whoever held Normandy held their loyalty.",
+        "It controlled the crossing between England and the rest of the Angevin lands, with Rouen as a rich capital.",
+        "Philip needed it to break the Angevin empire and make the French crown stronger than its vassals.",
+        "Its revenues were substantial. John's loss of it in 1204 left him poorer and looking weak."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why Richard was able to win back Normandy between 1194 and 1199.",
+      "given": "You may use: alliance, Chateau Gaillard. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Alliances with Flanders, Boulogne, Toulouse and the Emperor left Philip isolated.",
+        "Chateau Gaillard and a chain of castles controlled the Seine and shut Philip out of the route to Rouen.",
+        "Richard was an experienced commander, sharper after years of campaigning on crusade.",
+        "Victories at Freteval in 1194 and Gisors in 1198, where Philip fell in the river.",
+        "Money raised in England paid for mercenaries and building work on a scale Philip struggled to match."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why John's relationship with his barons worsened between 1205 and 1215.",
+      "given": "You may use: loss of Normandy, finances. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Losing Normandy in 1204 cost barons their French lands and cost John his reputation as a soldier.",
+        "Scutage demanded again and again, at rising rates, plus the thirteenth of 1207.",
+        "Abuse of feudal rights: vast reliefs and fines, and the destruction of the de Braose family as a warning.",
+        "Distrust. Taking hostages, including barons' sons, and relying on foreign mercenaries and low born officials.",
+        "The quarrel with the Pope, and then the failure of the 1214 Bouvines campaign that the taxes had paid for."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why there was a dispute between John and the Pope.",
+      "given": "You may use: the interdict, seizure of Church property. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Hubert Walter died in 1205 and the election of the next Archbishop of Canterbury was disputed.",
+        "Innocent III set both candidates aside and chose Stephen Langton in 1207. John refused to let him into England.",
+        "John saw it as interference in a royal right. Innocent saw it as the Church's own business.",
+        "John expelled the Canterbury monks and seized Church property, taking the income for himself.",
+        "Interdict in 1208, excommunication in 1209, and John submitted in 1213 when faced with deposition and a French invasion, accepting England as a papal fief."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why Richard I was able to secure his power when he became king.",
+      "given": "You may use: Richard's brother John, Richard's coronation. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "He was crowned quickly at Westminster in September 1189, and anointing made him God's chosen king.",
+        "He bought John off with lands, titles and a rich marriage rather than leaving him with a grievance.",
+        "He freed his mother Eleanor of Aquitaine, who worked to secure loyalty on his behalf.",
+        "He appointed men to govern while he was away, including William Longchamp as justiciar.",
+        "He sold offices and charters, which raised money and bound the buyers to him. He also settled with the king of Scots by the Quitclaim of Canterbury."
+      ]
+    },
+    {
+      "type": "long",
+      "label": "Explain why (12 marks)",
+      "prompt": "Explain why Richard I failed to recapture Jerusalem.",
+      "given": "You may use: supplies of food, Saladin. You must also use information of your own.",
+      "shape": [
+        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the second prompt. Same shape.",
+        "Paragraph on something of your own. This is where the top marks live."
+      ],
+      "hints": [
+        "Supply lines from the coast were long and exposed, and the army could not live off land Saladin had stripped.",
+        "Saladin destroyed crops and poisoned or blocked wells around Jerusalem.",
+        "Saladin could draw reinforcements from Egypt and Syria and simply wait.",
+        "Heat and disease wore the crusaders down on the march.",
+        "Philip's departure weakened the army, and Richard had to return home to deal with John and Philip."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘The Crusades were the main reason for the anti-Jewish pogroms in 1189–90.’ How far do you agree?",
+      "given": "You may use: events during Richard’s coronation, the death of Jesus. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: crusade preaching cast non-Christians as enemies, and men who had taken the cross turned on Jewish communities at home. The attacks run alongside the crusade preparations of 1189 and 1190.",
+        "Coronation: Jews who came with gifts were turned away and beaten at Westminster in September 1189, and a rumour spread that Richard had ordered it. London was attacked that night.",
+        "Older hatred: Jews were blamed for the death of Christ, and the blood libel had circulated in England since William of Norwich in 1144. York was attacked in Lent 1190, which sharpened it.",
+        "Against: debt. Richard Malebisse and other indebted gentry led the York attack, and the bonds were burned at York Minster. The Crusade gave them cover for something they already wanted.",
+        "Against: royal absence. Jews were protected by the king and taxed by him, which made them resented, and Richard had left for the crusade.",
+        "A judgement to consider: the Crusade supplied the timing and the excuse, debt supplied the leaders."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘Richard neglected the government of England.’ How far do you agree?",
+      "given": "You may use: securing England’s borders, use of patronage. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: he spent roughly six months of a ten year reign in England and treated it as a source of money, selling offices and charters, joking that he would sell London if he could find a buyer.",
+        "For: his absence let William Longchamp fall out with the barons and let John build a faction against him in 1193 and 1194.",
+        "Against: borders. He settled with William the Lion by the Quitclaim of Canterbury in 1189, which secured the north.",
+        "Against: patronage. Land, offices and marriages kept the barons who mattered on his side, and John’s rebellion collapsed without Richard coming home to fight it.",
+        "Against: he left a system that ran without him. Justiciars, Longchamp then Walter of Coutances then Hubert Walter, kept the Exchequer and the courts working.",
+        "A judgement to consider: government worked, and defending Normandy was defending England’s interests, but England paid for a king it rarely saw."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘John had to fight harder than Richard to secure the throne.’ How far do you agree?",
+      "given": "You may use: taxes, internal support. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: John faced a rival claim from Arthur of Brittany, backed by Philip II. Anjou, Maine and Touraine declared for Arthur in 1199.",
+        "For: he had to campaign for it, capturing Arthur at Mirebeau in 1202. Arthur’s disappearance then cost him support in Brittany and Normandy.",
+        "Against: Richard was the undisputed heir, crowned within weeks in September 1189, with Eleanor of Aquitaine working for him.",
+        "Against: Richard bought off the threat rather than fighting it, giving John lands, titles and a rich marriage.",
+        "Taxes: both raised heavy sums, Richard to leave for the crusade, John to buy support and pay mercenaries against Arthur.",
+        "Internal support: in England John had Hubert Walter and William Marshal behind him, so his problem was in France, not at home."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘The main reason for Richard’s failure to capture Jerusalem was the strength of Saladin and his army.’ How far do you agree?",
+      "given": "You may use: the march to Jaffa, Richard’s quarrel with Philip. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: Saladin had united Egypt and Syria, could draw fresh troops, and avoided open battle after Arsuf. He destroyed crops and wells around Jerusalem so no besieging army could feed itself.",
+        "Against: the march to Jaffa shows the army could be beaten. Richard kept discipline, was supplied by his fleet along the coast, and won at Arsuf in 1191.",
+        "Against: crusader division. Philip went home in 1191 with his troops, Richard insulted Duke Leopold at Acre, and the leaders argued over who should be king of Jerusalem.",
+        "Own: even if taken, Jerusalem could not be held once the crusaders sailed home. The military orders told Richard so, and he turned back twice.",
+        "Own: John and Philip were plotting in his lands, which forced him to leave.",
+        "A judgement to consider: Saladin’s strategy made it hard, the crusaders’ own divisions made it impossible."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘John lost Normandy because of his own mistakes.’ How far do you agree?",
+      "given": "You may use: strengths of Philip, John’s loss of alliances. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: he took Isabella of Angouleme in 1200 from Hugh de Lusignan, then refused Philip’s summons to answer for it, which let Philip declare his lands forfeit in 1202.",
+        "For: Arthur’s death lost him Breton and Norman loyalty, and his distrust of Norman barons and use of mercenaries pushed them towards Philip.",
+        "For: he failed to relieve Chateau Gaillard through the winter of 1203 and left Normandy in December 1203, which told the defenders no help was coming.",
+        "Against: Philip was strong. His royal lands and income had grown, his administration was efficient, and he used feudal law and patient sieges rather than risking battle.",
+        "Against: alliances. The network Richard had bought in Flanders, Boulogne and the Empire fell apart, so John fought alone.",
+        "Own: Richard had already drained the treasury, and John lacked his brother’s reputation as a soldier."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘King John’s financial policies did the most damage to John’s relationship with his barons.’ How far do you agree?",
+      "given": "You may use: loss of Normandy, arbitrary power. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: scutage was demanded eleven times in sixteen years and at rising rates, plus the thirteenth of 1207, tallage, forest fines and payments for justice.",
+        "For: reliefs and fines were set to cripple. William de Braose was charged thousands of marks he could never pay.",
+        "Against: loss of Normandy in 1204 cost barons their French estates and cost John his standing as a soldier. Bouvines in 1214 lost the campaign their taxes had funded.",
+        "Against: arbitrary power. Hostages taken from baronial families, the de Braose family left to starve, punishment without trial, and foreigners like Gerard d’Athee given power over them.",
+        "Own: the interdict and excommunication made him look cursed as well as greedy.",
+        "A judgement to consider: money was the constant grievance that touched everyone, arbitrary power turned resentment into fear."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘John’s failure to recapture his lands in France did the most damage to his relationship with his barons.’ How far do you agree?",
+      "given": "You may use: finances, arbitrary power. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: 1204 cost barons land and John his name as a warrior king. Bouvines in 1214 was the final proof, and the rebellion followed within months.",
+        "For: northern barons refused to serve in Poitou at all, which shows the French wars were the flashpoint.",
+        "Against: finances. Repeated scutage, the thirteenth of 1207 and crushing reliefs were felt every year, not only in campaign years.",
+        "Against: arbitrary power. Hostages, imprisonment without trial and the destruction of the de Braose family made barons fear for their families.",
+        "Own: the quarrel with the Pope, and John’s own character. Chroniclers describe a suspicious king who trusted nobody.",
+        "A judgement to consider: the failure in France is what turned grievances into rebellion, because it proved the money had bought nothing."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘William Marshal’s leadership was the main reason the French invasion of England failed.’ How far do you agree?",
+      "given": "You may use: the Battle of Lincoln, King John’s death. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: Marshal took the regency at about seventy, held the loyalist side together, and led the victory at Lincoln in May 1217.",
+        "For: he reissued Magna Carta in 1216, which removed the rebels’ stated reason for fighting and gave them a way back.",
+        "Against: John’s death in October 1216 removed the barons’ main grievance. A nine year old boy was far easier to support than his father.",
+        "Against: Hubert de Burgh’s naval victory off Sandwich in August 1217 cut Louis off from reinforcements and ended the war.",
+        "Own: the papal legate Guala backed Henry III and excommunicated the rebels, which turned the Church against Louis.",
+        "Own: Louis’s French troops were resented, and English barons had little appetite for a French king once John was gone."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘Serious financial difficulties were the main consequence of England’s involvement in fighting overseas in the years 1189–1204.’ How far do you agree?",
+      "given": "You may use: war against Philip II of France, Richard I’s ransom. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: the ransom of 150,000 marks took a quarter of movable goods and stripped churches of plate.",
+        "For: war with Philip meant mercenaries, allies bought with cash, and castles like Chateau Gaillard, paid for by tax after tax while prices were rising.",
+        "Against: the political consequence was larger. Normandy was lost in 1204 and the Angevin empire broke apart.",
+        "Against: absent kings strengthened English government. Justiciars, the Exchequer and the royal courts grew more organised because they had to run without a king.",
+        "Own: the resentment built in these years fed directly into the rebellion of 1215.",
+        "Own: reputation. Richard came out of it a hero and John a failure, which shaped how their barons treated them."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘Financial gain was the main reason for men joining the English crusading army.’ How far do you agree?",
+      "given": "You may use: debts, religion. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: plunder, land and wages were real prospects, and Richard paid his soldiers.",
+        "For: debts were frozen and interest suspended while a crusader was away, and his property was protected, so taking the cross could be an escape from creditors.",
+        "Against: religion. Forgiveness of sins and a shorter stay in purgatory were preached hard after Jerusalem fell in 1187, and most people believed it completely.",
+        "Against: obligation. When a lord took the cross his household and tenants were expected to go with him.",
+        "Own: status and adventure. A returning crusader had a name for life.",
+        "A judgement to consider: most went home poorer or did not go home at all, which makes financial gain a weak explanation for the numbers involved."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘King John’s use of arbitrary power was the main reason for his worsening relationship with the barons in the years 1209–14.’ How far do you agree?",
+      "given": "You may use: fines, loss of Normandy. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: he took hostages from baronial families, imprisoned without trial, and destroyed the de Braose family as a warning to everyone else.",
+        "For: he promoted foreigners such as Gerard d’Athee and low born officials over barons, and treated the great families unequally.",
+        "Against: fines. Reliefs, amercements, the sale of wardships and marriages, and the thirteenth of 1207 hit every baron’s pocket year after year.",
+        "Against: loss of Normandy. Barons had lost estates in 1204 and were being taxed to win back land many no longer expected to see.",
+        "Own: excommunication from 1209 made him a king under the Church’s ban, which loosened the bond of loyalty.",
+        "Own: the defeat at Bouvines in 1214 proved the money and the fear had produced nothing."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘Religion was the main motive for King Richard I’s involvement in the Third Crusade.’ How far do you agree?",
+      "given": "You may use: the Pope, reputation. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: Jerusalem fell to Saladin in 1187 and the Pope called for a crusade, promising forgiveness of sins.",
+        "For: Richard took the cross in 1187, before he was king, when he had less to gain politically.",
+        "Against: reputation. He was a soldier before he was anything else, and a crusade was the largest stage in Christendom.",
+        "Against: rivalry with Philip II, who was also going, and a family debt of honour, since his father had promised to go and never went.",
+        "Own: going back on the cross would have shamed him and given his enemies a weapon.",
+        "A judgement to consider: the motives are hard to separate, but glory explains the scale of what he spent and risked."
+      ]
+    },
+    {
+      "type": "judge",
+      "label": "How far do you agree (16 marks)",
+      "prompt": "‘The succession was the main problem facing England when King John died.’ How far do you agree?",
+      "given": "You may use: William Marshal, the economy. You must also use information of your own.",
+      "shape": [
+        "Paragraph arguing yes, the statement is right. Use the first prompt.",
+        "Paragraph arguing something else mattered more. Use the second prompt.",
+        "Paragraph on a factor of your own.",
+        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "Spelling, punctuation and grammar are marked on this question too."
+      ],
+      "hints": [
+        "For: Henry III was nine years old, could not lead an army, and was crowned at Gloucester with a circlet because the regalia had been lost.",
+        "Against: William Marshal settled it quickly. He took the regency, the legate Guala backed the boy, and the reissue of Magna Carta in 1216 gave rebels a route back.",
+        "Against: the economy. Years of war and taxation had drained the country, trade was disrupted, and mercenaries still needed paying.",
+        "Own: the civil war itself. Louis of France held London and the south east, and rebel barons held castles across the country.",
+        "Own: the succession was arguably an opportunity, since a child king removed the man the barons had rebelled against.",
+        "A judgement to consider: the succession was solved within weeks, the war and the money took another two years."
+      ]
+    }
+  ]
+}

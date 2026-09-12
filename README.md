@@ -1,3 +1,18 @@
+# Elena's Apps
+
+Two revision apps behind one menu, sharing a stack, a database and a passcode.
+
+- **`/`** — the menu.
+- **`/forgetful-doodle`** — Forgetful Doodle 2.0, below. Fast competitive recall.
+- **`/ummm-less-panic`** — Ummm Less Panic. Written exam questions, one at a
+  time, with an answer structure and memory prompts. Light surface, serif
+  reading face, nothing timed and nothing scored.
+
+The arcade used to sit at the root. It moved to `/forgetful-doodle` so the menu
+could have that address, and the old link now lands on the menu.
+
+---
+
 # Forgetful Doodle 2.0 — _for Elena_
 
 Fast, competitive active recall — the warm-up before the formal work. One card at
@@ -102,8 +117,33 @@ export const GET = withSession(async (req, ctx, session) => { /* ... */ });
   `types.ts`, `db.ts` (Vercel Postgres), `session-token.ts` (pure passcode and
   cookie signing), `session.ts` (cookies and the `withSession` wrapper),
   `profile-merge.ts` (local/server reconcile), `validate-profile.ts` (incoming
-  body checks), `user.ts`.
+  body checks), `downscale-image.ts` (shrinks a photo before upload),
+  `safe-json.ts` (reads a response body as text before parsing), `user.ts`.
 - `proxy.ts` — the passcode gate, in front of every route.
+
+### Ummm Less Panic
+
+- `app/ummm-less-panic/page.tsx` — the whole app.
+- `app/api/sheets/` — list and create, open and delete, save an answer, and
+  `generate` which turns pasted questions into cards.
+- `lib/revision-db.ts` — its database access, separate from `lib/db.ts` so
+  fixing one app cannot break the other. Same client, same `POSTGRES_URL`.
+
+Two tables of its own, `revision_sheet` and `revision_answer`. Nothing
+Forgetful Doodle uses is touched. Create and seed them once:
+
+```bash
+node --env-file=.env.local scripts/init-revision-db.mjs
+node --env-file=.env.local scripts/seed-history.mjs
+```
+
+Both are safe to run again. The table creation is wrapped in a transaction, so
+a failure halfway leaves the database as it was.
+
+**The hints on a generated sheet come from a model, so they can be wrong.** It
+is told to leave out anything it is unsure of rather than guess, and that mostly
+holds. Where a wrong date costs marks, check a surprise against your notes. The
+sheet is a prompt, not gospel.
 
 ## Privacy
 

@@ -81,8 +81,10 @@ export function withSession<C = unknown>(
   return async (req: NextRequest, ctx: C) => {
     const session = await verifySession();
     if (!session) {
+      // lib/safe-json.ts surfaces the `error` field to the reader, so the
+      // human sentence goes there and the machine code alongside it.
       return Response.json(
-        { error: "locked", message: "Enter the passcode to continue." },
+        { error: "Enter the passcode to continue.", code: "locked" },
         { status: 401 },
       );
     }

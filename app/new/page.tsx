@@ -6,6 +6,8 @@ import { Suspense, useMemo, useRef, useState } from "react";
 import { SUBJECTS, getSubject } from "@/lib/subjects";
 import { accentText } from "@/lib/accent";
 import type { Card, Deck } from "@/lib/types";
+import { downscaleImage } from "@/lib/downscale-image";
+import { readResponse } from "@/lib/safe-json";
 import { useProfile } from "@/components/ProfileProvider";
 import { Wordmark } from "@/components/Wordmark";
 
@@ -50,7 +52,7 @@ function NewDeck() {
     <main className="mx-auto w-full max-w-2xl px-5 pb-24 pt-6">
       <div className="flex items-center justify-between">
         <Link
-          href="/"
+          href="/forgetful-doodle"
           className="text-muted hover:text-ink text-sm transition-colors"
         >
           ← Arcade
@@ -163,6 +165,7 @@ function AiBuilder({
   const [topic, setTopic] = useState("");
   const [notes, setNotes] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -170,14 +173,24 @@ function AiBuilder({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const canGenerate =
-    !loading && (!requiresContext || Boolean(topic.trim() || notes.trim() || image));
+    !loading &&
+    !preparing &&
+    (!requiresContext || Boolean(topic.trim() || notes.trim() || image));
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setImage(reader.result as string);
-    reader.readAsDataURL(file);
+    // Shrink before encoding. A straight camera photo, base64'd, is usually
+    // over the platform's request limit and never reaches the route.
+    setPreparing(true);
+    setError(null);
+    const result = await downscaleImage(file);
+    setPreparing(false);
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    setImage(result.dataUrl);
   }
 
   async function generate() {
@@ -190,13 +203,17 @@ function AiBuilder({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subjectId, topic, notes, image }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Couldn't make that deck.");
+      // readResponse reads the body as text first. A request rejected by the
+      // platform rather than by the route returns HTML, and res.json() threw
+      // on it, which is how a too-big photo came out as "check your
+      // connection".
+      const out = await readResponse<{ title: string; cards: DraftCard[] }>(res);
+      if (!out.ok) {
+        setError(out.error);
         return;
       }
-      setTitle(data.title);
-      setCards(data.cards);
+      setTitle(out.data.title);
+      setCards(out.data.cards);
     } catch {
       setError("Couldn't reach the deck-maker. Check your connection?");
     } finally {
@@ -250,7 +267,12 @@ function AiBuilder({
           onClick={() => fileRef.current?.click()}
           className="border-white/15 text-muted hover:border-white/25 rounded-xl border px-3 py-2 text-sm transition-colors"
         >
-          📷 {image ? "Change photo" : "Add a photo"}
+          📷{" "}
+          {preparing
+            ? "Shrinking photo…"
+            : image
+              ? "Change photo"
+              : "Add a photo"}
         </button>
         {image && (
           <div className="flex items-center gap-2">
