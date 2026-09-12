@@ -352,7 +352,7 @@ section{margin-bottom:2rem;page-break-inside:avoid}
     return (
       <Surface error={error}>
         <Link href="/" className={btnBack + " mb-4 inline-block"}>
-          Elena&apos;s Apps
+          &larr; Elena&apos;s Apps
         </Link>
         <h1 className={h1}>Ummm Less Panic!</h1>
         <p className={lede}>
