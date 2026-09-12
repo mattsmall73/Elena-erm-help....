@@ -1,4 +1,4 @@
-import { sql } from "@vercel/postgres";
+import { db, sql } from "@vercel/postgres";
 import type { Deck, ProfileState } from "./types";
 import { emptyProfile } from "./types";
 
@@ -98,34 +98,77 @@ export async function saveState(state: ProfileState): Promise<void> {
 
   const now = Date.now();
 
-  await sql`
-    INSERT INTO profile (user_id, day_streak, last_played, comfort, updated_at)
-    VALUES (${USER_ID}, ${state.dayStreak}, ${state.lastPlayed}, ${state.comfortReading}, ${now})
-    ON CONFLICT (user_id) DO UPDATE SET
-      day_streak = EXCLUDED.day_streak,
-      last_played = EXCLUDED.last_played,
-      comfort = EXCLUDED.comfort,
-      updated_at = EXCLUDED.updated_at;
-  `;
+  // Two of these statements clear rows before writing the replacements, so the
+  // whole save runs in one transaction. Without it a save that dies part-way
+  // leaves the delete committed and the inserts missing, which loses every
+  // deck she has made.
+  const client = await db.connect();
+  try {
+    await client.sql`BEGIN`;
 
-  // Upsert best scores (keep the higher of stored vs incoming).
-  for (const [deckId, best] of Object.entries(state.bests)) {
-    await sql`
-      INSERT INTO deck_best (user_id, deck_id, score, updated_at)
-      VALUES (${USER_ID}, ${deckId}, ${best.score}, ${best.updatedAt})
-      ON CONFLICT (user_id, deck_id) DO UPDATE SET
-        score = GREATEST(deck_best.score, EXCLUDED.score),
+    await client.sql`
+      INSERT INTO profile (user_id, day_streak, last_played, comfort, updated_at)
+      VALUES (${USER_ID}, ${state.dayStreak}, ${state.lastPlayed}, ${state.comfortReading}, ${now})
+      ON CONFLICT (user_id) DO UPDATE SET
+        day_streak = EXCLUDED.day_streak,
+        last_played = EXCLUDED.last_played,
+        comfort = EXCLUDED.comfort,
         updated_at = EXCLUDED.updated_at;
     `;
-  }
 
-  // Reconcile custom decks: the posted set is the source of truth, so clear
-  // and re-insert (the data volume is tiny — a handful of decks).
-  await sql`DELETE FROM custom_deck WHERE user_id = ${USER_ID};`;
-  for (const deck of state.customDecks) {
-    await sql`
-      INSERT INTO custom_deck (user_id, deck_id, data, created_at)
-      VALUES (${USER_ID}, ${deck.id}, ${JSON.stringify(deck)}::jsonb, ${deck.createdAt ?? now});
-    `;
+    // Upsert best scores in one statement (keep the higher of stored vs
+    // incoming, so a stale client can never lower a personal best).
+    const bestEntries = Object.entries(state.bests);
+    if (bestEntries.length > 0) {
+      const rows: string[] = [];
+      const values: (string | number)[] = [];
+      bestEntries.forEach(([deckId, best], i) => {
+        const p = i * 4;
+        rows.push(`($${p + 1}, $${p + 2}, $${p + 3}, $${p + 4})`);
+        values.push(USER_ID, deckId, best.score, best.updatedAt);
+      });
+      await client.query(
+        `INSERT INTO deck_best (user_id, deck_id, score, updated_at)
+         VALUES ${rows.join(", ")}
+         ON CONFLICT (user_id, deck_id) DO UPDATE SET
+           score = GREATEST(deck_best.score, EXCLUDED.score),
+           updated_at = EXCLUDED.updated_at;`,
+        values,
+      );
+    }
+
+    // Reconcile custom decks. The posted set is the source of truth, so clear
+    // and re-insert; the volume is a handful of rows. Deduplicated by deck id
+    // because the primary key would reject a repeat and fail the whole save.
+    await client.sql`DELETE FROM custom_deck WHERE user_id = ${USER_ID};`;
+
+    const decks = [...new Map(state.customDecks.map((d) => [d.id, d])).values()];
+    if (decks.length > 0) {
+      const rows: string[] = [];
+      const values: (string | number)[] = [];
+      decks.forEach((deck, i) => {
+        const p = i * 4;
+        rows.push(`($${p + 1}, $${p + 2}, $${p + 3}::jsonb, $${p + 4})`);
+        values.push(USER_ID, deck.id, JSON.stringify(deck), deck.createdAt ?? now);
+      });
+      await client.query(
+        `INSERT INTO custom_deck (user_id, deck_id, data, created_at)
+         VALUES ${rows.join(", ")};`,
+        values,
+      );
+    }
+
+    await client.sql`COMMIT`;
+  } catch (err) {
+    // A rollback on an already-broken connection throws in turn; swallow that
+    // so the caller sees the failure that actually matters.
+    try {
+      await client.sql`ROLLBACK`;
+    } catch {
+      /* connection is gone; the transaction dies with it */
+    }
+    throw err;
+  } finally {
+    client.release();
   }
 }
