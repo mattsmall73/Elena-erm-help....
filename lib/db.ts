@@ -1,14 +1,10 @@
 import { db, sql } from "@vercel/postgres";
 import type { Deck, ProfileState } from "./types";
 import { emptyProfile } from "./types";
-
 // Single implicit user (it's just Elena). Everything is keyed to this id.
-//
-// This is a partition key, not a credential: it says which rows belong to the
-// profile, and nothing about who is allowed to read or write them. Anyone able
-// to reach the route gets this profile. Access control belongs in front of the
-// route, not here.
-const USER_ID = process.env.DOODLE_USER_ID || "elena";
+import { USER_ID } from "./user";
+
+
 
 export class DbNotConfiguredError extends Error {}
 

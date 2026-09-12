@@ -61,6 +61,20 @@ function readLocal(): ProfileState {
   }
 }
 
+/**
+ * A 401 means the passcode session has expired while the tab was open. Without
+ * this it reads as "no database" and she carries on editing a local copy that
+ * will never sync, so send her to unlock instead. Returns true when handled.
+ */
+function handleLocked(res: Response): boolean {
+  if (res.status !== 401) return false;
+  if (typeof window !== "undefined") {
+    const back = window.location.pathname + window.location.search;
+    window.location.href = `/unlock?next=${encodeURIComponent(back)}`;
+  }
+  return true;
+}
+
 function readSyncedIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
@@ -103,6 +117,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify(next),
     })
       .then((res) => {
+        if (handleLocked(res)) return;
         if (res.ok) writeSyncedIds(next.customDecks.map((d) => d.id));
       })
       .catch(() => {});
@@ -118,7 +133,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const res = await fetch("/api/state", { cache: "no-store" });
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (!res.ok) {
+          handleLocked(res);
+          return;
+        }
         const server = (await res.json()) as ProfileState | null;
         if (server && !cancelled) {
           const merged = mergeProfiles(

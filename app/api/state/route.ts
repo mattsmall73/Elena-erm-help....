@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { getState, saveState, isDbConfigured } from "@/lib/db";
 import { validateProfileState } from "@/lib/validate-profile";
+import { withSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // When there's no database (e.g. local dev without POSTGRES_URL), these return
 // 503 and the client quietly runs on localStorage instead.
+//
+// withSession is the real access check. proxy.ts turns unauthenticated traffic
+// away before it gets here, but it is not the only line of defence.
 
-export async function GET() {
+export const GET = withSession(async () => {
   if (!isDbConfigured()) {
     return NextResponse.json({ error: "no-db" }, { status: 503 });
   }
@@ -18,9 +22,9 @@ export async function GET() {
   } catch {
     return NextResponse.json({ error: "db-error" }, { status: 503 });
   }
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withSession(async (req) => {
   if (!isDbConfigured()) {
     return NextResponse.json({ error: "no-db" }, { status: 503 });
   }
@@ -46,4 +50,4 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "db-error" }, { status: 503 });
   }
-}
+});
