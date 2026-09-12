@@ -280,7 +280,6 @@ export async function saveMark(
   `;
 }
 
-/** One question and her answer to it. */
 export interface OtherAnswer {
   questionIndex: number;
   prompt: string;
@@ -326,12 +325,22 @@ export async function listOtherAnswers(
   }));
 }
 
+/**
+ * One question and her answer to it.
+ *
+ * The ::int on the index is load-bearing and must not be dropped. Postgres
+ * infers text for a bare bound parameter after ->, which selects the
+ * jsonb -> text operator, meaning "get the object field by this key". On a
+ * JSON array that returns NULL, so the lookup silently found nothing and
+ * marking answered "That question is not here." The int cast selects
+ * jsonb -> integer, which is the array subscript that was intended.
+ */
 export async function getAnswerForMarking(
   sheetId: string,
   questionIndex: number,
 ): Promise<{ question: Question; answer: string } | null> {
   const res = await sql`
-    SELECT s.questions -> ${questionIndex} AS question,
+    SELECT s.questions -> ${questionIndex}::int AS question,
            COALESCE(a.answer, '') AS answer
     FROM revision_sheet s
     LEFT JOIN revision_answer a
