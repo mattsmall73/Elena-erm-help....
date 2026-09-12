@@ -143,13 +143,16 @@ export const GET = withSession(async (req, ctx, session) => { /* ... */ });
 ### Ummm Less Panic
 
 - `app/ummm-less-panic/page.tsx` — the whole app.
-- `app/api/sheets/` — list and create, open and delete, save an answer, and
-  `generate` which turns pasted questions into cards.
+- `app/api/sheets/` — list and create, open and delete, save an answer,
+  `generate` which turns pasted questions into cards, and `mark` which marks
+  one answer and coaches the one change that would raise it.
+- `lib/marking.ts` — the running grade and the mark line. Pure arithmetic: the
+  grade is calculated here and never by the model.
 - `lib/revision-db.ts` — its database access, separate from `lib/db.ts` so
   fixing one app cannot break the other. Same client, same `POSTGRES_URL`.
 
-Two tables of its own, `revision_sheet` and `revision_answer`. Nothing
-Forgetful Doodle uses is touched.
+Three tables of its own, `revision_sheet`, `revision_answer` and
+`revision_mark`. Nothing Forgetful Doodle uses is touched.
 
 **Setting it up needs no terminal.** Two steps:
 

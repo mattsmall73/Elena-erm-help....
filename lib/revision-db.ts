@@ -1,5 +1,6 @@
 import { sql } from "@vercel/postgres";
 import { USER_ID } from "./user";
+import type { StoredMark } from "./marking";
 
 /* Deliberately a separate file from lib/db.ts so that fixing one app
    cannot break the other. Same client, same POSTGRES_URL, no new
@@ -67,7 +68,9 @@ export async function getSheet(id: string) {
     if (row.flagged) flags[row.question_index as number] = true;
   }
 
-  return { sheet: sheetRes.rows[0] as Sheet, answers, flags };
+  const marks = await listMarks(id);
+
+  return { sheet: sheetRes.rows[0] as Sheet, answers, flags, marks };
 }
 
 /**
@@ -177,6 +180,92 @@ export async function saveAnswer(
                   flagged = EXCLUDED.flagged,
                   updated_at = NOW();
   `;
+}
+
+export interface MarkRow extends StoredMark {
+  feedback: unknown;
+  markedAt: number;
+}
+
+/** Every mark on a sheet, for the running grade and for showing past feedback. */
+export async function listMarks(sheetId: string): Promise<MarkRow[]> {
+  const res = await sql`
+    SELECT question_index, mark, max_mark, level, max_level,
+           previous_mark, previous_level, feedback,
+           (EXTRACT(EPOCH FROM marked_at) * 1000)::bigint AS marked_ms
+    FROM revision_mark
+    WHERE sheet_id = ${sheetId} AND user_id = ${USER_ID}
+    ORDER BY question_index;
+  `;
+  return res.rows.map((r) => ({
+    questionIndex: r.question_index as number,
+    mark: r.mark as number | null,
+    maxMark: r.max_mark as number | null,
+    level: r.level as number | null,
+    maxLevel: r.max_level as number | null,
+    previousMark: r.previous_mark as number | null,
+    previousLevel: r.previous_level as number | null,
+    feedback: r.feedback,
+    markedAt: Number(r.marked_ms),
+  }));
+}
+
+/**
+ * Store a mark, moving whatever was there into the previous columns.
+ *
+ * Every SET expression sees the row as it was, so previous_mark picks up the
+ * old mark in the same statement that overwrites it. That is what lets a
+ * re-mark show "was 8, now 10", which is the payoff for rewriting a paragraph.
+ *
+ * No user_id guard is needed on the conflict here, unlike revision_sheet: this
+ * primary key already includes user_id, so a conflict can only ever be her own
+ * earlier mark on the same question.
+ */
+export async function saveMark(
+  sheetId: string,
+  questionIndex: number,
+  m: {
+    mark: number | null;
+    maxMark: number | null;
+    level: number | null;
+    maxLevel: number | null;
+    feedback: unknown;
+  },
+): Promise<void> {
+  await sql`
+    INSERT INTO revision_mark
+      (sheet_id, user_id, question_index, mark, max_mark, level, max_level, feedback)
+    VALUES (${sheetId}, ${USER_ID}, ${questionIndex}, ${m.mark}, ${m.maxMark},
+            ${m.level}, ${m.maxLevel}, ${JSON.stringify(m.feedback)}::jsonb)
+    ON CONFLICT (sheet_id, user_id, question_index) DO UPDATE SET
+      previous_mark = revision_mark.mark,
+      previous_level = revision_mark.level,
+      mark = EXCLUDED.mark,
+      max_mark = EXCLUDED.max_mark,
+      level = EXCLUDED.level,
+      max_level = EXCLUDED.max_level,
+      feedback = EXCLUDED.feedback,
+      marked_at = NOW();
+  `;
+}
+
+/** One question and her answer to it, which is all the marker ever sees. */
+export async function getAnswerForMarking(
+  sheetId: string,
+  questionIndex: number,
+): Promise<{ question: Question; answer: string } | null> {
+  const res = await sql`
+    SELECT s.questions -> ${questionIndex} AS question,
+           COALESCE(a.answer, '') AS answer
+    FROM revision_sheet s
+    LEFT JOIN revision_answer a
+      ON a.sheet_id = s.id AND a.user_id = s.user_id
+         AND a.question_index = ${questionIndex}
+    WHERE s.id = ${sheetId} AND s.user_id = ${USER_ID};
+  `;
+  const row = res.rows[0];
+  if (!row || row.question === null) return null;
+  return { question: row.question as Question, answer: row.answer as string };
 }
 
 /* One statement, because revision_answer.sheet_id cascades on delete. The

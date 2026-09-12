@@ -4,6 +4,14 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { readResponse } from "@/lib/safe-json";
 import { SEED_SHEET } from "@/lib/seed-sheet";
+import {
+  GRADE_MIN_MARKED,
+  gradeLabel,
+  markLine,
+  movement,
+  runningGrade,
+  type StoredMark,
+} from "@/lib/marking";
 import type { Question, Sheet, SheetSummary } from "@/lib/revision-db";
 
 const BATCH = 4; // questions sent to the model at a time
@@ -15,6 +23,29 @@ const BATCH = 4; // questions sent to the model at a time
 const HINT_WORD_THRESHOLD = 20;
 
 type Screen = "sheets" | "create" | "pick" | "quiz" | "end";
+
+interface Feedback {
+  status: "marked" | "too_short";
+  openingLine?: string;
+  mark?: number | null;
+  maxMark?: number | null;
+  level?: number | null;
+  maxLevel?: number | null;
+  levelWording?: string;
+  nextLevelMark?: number | null;
+  workingWell?: string;
+  oneChange?: { observation: string; why: string; task: string };
+  alsoAvailable?: string[];
+  factualNotes?: string[];
+  spelling?: { marksAvailable: number; fixes: string[] };
+  markSchemeWording?: string;
+  previousMark?: number | null;
+  previousLevel?: number | null;
+}
+
+interface MarkRecord extends StoredMark {
+  feedback: Feedback;
+}
 
 /* Tailwind class groups, named once so the markup below stays readable. */
 const btnSolid =
@@ -78,6 +109,9 @@ export default function UmmmLessPanic() {
   const [pupilName, setPupilName] = useState("");
   const [seeding, setSeeding] = useState(false);
   const [seedNote, setSeedNote] = useState("");
+  const [marks, setMarks] = useState<Record<number, MarkRecord>>({});
+  const [marking, setMarking] = useState(false);
+  const [openPanel, setOpenPanel] = useState<string>("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -151,12 +185,16 @@ export default function UmmmLessPanic() {
       sheet: Sheet;
       answers: Record<number, string>;
       flags: Record<number, boolean>;
+      marks?: MarkRecord[];
     }>(res);
 
     if (out.ok) {
       setSheet(out.data.sheet);
       setAnswers(out.data.answers);
       setFlags(out.data.flags);
+      const byIndex: Record<number, MarkRecord> = {};
+      for (const m of out.data.marks ?? []) byIndex[m.questionIndex] = m;
+      setMarks(byIndex);
       setDone({});
       setError("");
       setScreen("pick");
@@ -164,6 +202,47 @@ export default function UmmmLessPanic() {
       setError(out.error);
     }
     setLoading(false);
+  }
+
+  /* Marks one answer. Never the whole sheet: the feedback stays on one piece
+     of writing, and she can mark a single answer without starting a session.
+     The running grade is worked out in code from the stored levels, so the
+     marker is never asked to estimate one and never sees another answer. */
+  async function markAnswer(idx: number) {
+    if (!sheet || marking) return;
+    setMarking(true);
+    setError("");
+    setOpenPanel("");
+    try {
+      const res = await fetch(`/api/sheets/${sheet.id}/mark`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionIndex: idx }),
+      });
+      const out = await readResponse<Feedback>(res);
+      if (!out.ok) {
+        setError(out.error);
+        return;
+      }
+      const fb = out.data;
+      setMarks((prev) => ({
+        ...prev,
+        [idx]: {
+          questionIndex: idx,
+          mark: fb.mark ?? null,
+          maxMark: fb.maxMark ?? null,
+          level: fb.level ?? null,
+          maxLevel: fb.maxLevel ?? null,
+          previousMark: fb.previousMark ?? null,
+          previousLevel: fb.previousLevel ?? null,
+          feedback: fb,
+        },
+      }));
+    } catch {
+      setError("Couldn't reach the marker. Check your connection?");
+    } finally {
+      setMarking(false);
+    }
   }
 
   async function buildSheet() {
@@ -361,6 +440,11 @@ section{margin-bottom:2rem;page-break-inside:avoid}
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
+  /* Worked out here, in code, from the stored levels. Nothing below five
+     marked answers, because fewer than that swings by two grades and means
+     nothing, and a single answer never carries a grade at all. */
+  const grade = runningGrade(Object.values(marks));
+
   const hasSeedSheet = sheets.some(
     (s) => s.id === SEED_SHEET.id || s.title === SEED_SHEET.title,
   );
@@ -532,6 +616,8 @@ section{margin-bottom:2rem;page-break-inside:avoid}
           {sheet.questions.length} questions. Pick a size and it will show you one at a time.
         </p>
 
+        <GradeStrip grade={grade} marked={Object.keys(marks).length} />
+
         <div className="border-calm-line border-t">
           <Choice n={3} t="Three to start" d="Picked at random. Enough to prove the day is not a write-off." onClick={() => startRun("three")} />
           {unanswered > 0 && (
@@ -655,22 +741,62 @@ section{margin-bottom:2rem;page-break-inside:avoid}
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button
+            className={btnQuiet}
+            disabled={marking || words < 15}
+            onClick={() => void markAnswer(idx)}
+            title={
+              words < 15
+                ? "A few more lines first and it is worth a look."
+                : undefined
+            }
+          >
+            {marking
+              ? "marking…"
+              : marks[idx]
+                ? "mark it again"
+                : "mark this"}
+          </button>
+        </div>
+
+        {marks[idx] && (
+          <MarkPanel
+            record={marks[idx]}
+            openPanel={openPanel}
+            setOpenPanel={setOpenPanel}
+          />
+        )}
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           {pos > 0 && (
             <button
               className={btnBack}
               onClick={() => {
                 setPos(pos - 1);
                 setHintsShown(0);
+                setOpenPanel("");
               }}
             >
               back
             </button>
           )}
           <span className="flex-1" />
-          <button className={btnQuiet} onClick={() => advance(true)}>
+          <button
+            className={btnQuiet}
+            onClick={() => {
+              setOpenPanel("");
+              advance(true);
+            }}
+          >
             Come back to this
           </button>
-          <button className={btnSolid} onClick={() => advance(false)}>
+          <button
+            className={btnSolid}
+            onClick={() => {
+              setOpenPanel("");
+              advance(false);
+            }}
+          >
             Done
           </button>
         </div>
@@ -693,6 +819,8 @@ section{margin-bottom:2rem;page-break-inside:avoid}
               ? "One you parked:"
               : flaggedNow.length + " you parked:"}
         </p>
+
+        <GradeStrip grade={grade} marked={Object.keys(marks).length} />
 
         {flaggedNow.length > 0 && (
           <ul className="font-read mb-6 list-disc pl-5">
@@ -747,6 +875,208 @@ section{margin-bottom:2rem;page-break-inside:avoid}
     <Surface error={error}>
       <p className="text-calm-soft text-sm">Loading</p>
     </Surface>
+  );
+}
+
+/**
+ * The mark and the coaching, in the order the brief fixes:
+ * the mark line, what's working, the one change with its task, marks available
+ * elsewhere collapsed, spelling in its own collapsed panel, and the mark
+ * scheme wording on tap.
+ *
+ * Module scope, like Surface, so a re-render cannot remount it.
+ *
+ * The mark never appears on its own. markLine builds the whole sentence or
+ * returns nothing, and a single answer never carries a grade.
+ */
+/**
+ * The running grade across a sheet.
+ *
+ * Shows nothing at all until five answers are marked, and says how many it is
+ * based on when it does, so the sample size is never hidden. While it is
+ * building it says so, which is more use than silence.
+ */
+function GradeStrip({
+  grade,
+  marked,
+}: {
+  grade: ReturnType<typeof runningGrade>;
+  marked: number;
+}) {
+  if (marked === 0) return null;
+
+  if (grade.band === null) {
+    const left = GRADE_MIN_MARKED - grade.counted;
+    return (
+      <p className="text-calm-soft mb-6 text-sm">
+        {marked === 1 ? "1 answer marked" : `${marked} answers marked`}.{" "}
+        {left === 1
+          ? "One more and there is enough to show a grade."
+          : `${left} more and there is enough to show a grade.`}
+      </p>
+    );
+  }
+
+  return (
+    <div className="border-calm-line bg-calm-card mb-6 border px-4 py-3">
+      <p className="font-read text-calm-ink text-lg">
+        Working at around grade {grade.band}
+      </p>
+      <p className="text-calm-soft text-sm">{gradeLabel(grade)}</p>
+    </div>
+  );
+}
+
+function MarkPanel({
+  record,
+  openPanel,
+  setOpenPanel,
+}: {
+  record: MarkRecord;
+  openPanel: string;
+  setOpenPanel: (p: string) => void;
+}) {
+  const fb = record.feedback;
+
+  if (fb.status === "too_short") {
+    return (
+      <div className="border-calm-line bg-calm-card mt-5 border px-4 py-4">
+        <p className="text-calm-ink text-sm">{fb.openingLine}</p>
+      </div>
+    );
+  }
+
+  const line = markLine({
+    mark: record.mark,
+    maxMark: record.maxMark,
+    level: record.level,
+    nextLevelMark: fb.nextLevelMark ?? null,
+  });
+  const moved = movement({ mark: record.mark, previousMark: record.previousMark });
+  const toggle = (key: string) => setOpenPanel(openPanel === key ? "" : key);
+
+  return (
+    <div className="border-calm-line bg-calm-card mt-5 border px-4 py-4">
+      {line && (
+        <p className="font-read text-calm-ink mb-1 text-xl">
+          {line}
+          {fb.levelWording ? (
+            <span className="text-calm-soft font-body block text-sm">
+              {fb.levelWording}
+            </span>
+          ) : null}
+        </p>
+      )}
+
+      {moved && (
+        <p className="text-calm-moss mb-3 text-sm font-medium">{moved}</p>
+      )}
+
+      {fb.workingWell && (
+        <div className="mt-4">
+          <h3 className="text-calm-plum mb-1 text-sm font-medium">Working</h3>
+          <p className="text-calm-ink text-sm leading-relaxed">{fb.workingWell}</p>
+        </div>
+      )}
+
+      {fb.oneChange?.observation && (
+        <div className="mt-4">
+          <h3 className="text-calm-plum mb-1 text-sm font-medium">Change this</h3>
+          <p className="text-calm-ink text-sm leading-relaxed">
+            {fb.oneChange.observation}
+          </p>
+          {fb.oneChange.why && (
+            <p className="text-calm-ink mt-2 text-sm leading-relaxed">
+              {fb.oneChange.why}
+            </p>
+          )}
+          {fb.oneChange.task && (
+            <p className="border-calm-plum/40 text-calm-ink mt-3 border-l-2 pl-3 text-sm">
+              Try this: {fb.oneChange.task}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Corrections sit with the content, quietly, rather than as an alarm. */}
+      {(fb.factualNotes?.length ?? 0) > 0 && (
+        <ul className="text-calm-soft mt-4 list-disc pl-5 text-sm">
+          {fb.factualNotes!.map((n, i) => (
+            <li key={i} className="my-1">
+              {n}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {(fb.alsoAvailable?.length ?? 0) > 0 && (
+        <div className="border-calm-line mt-4 border-t pt-3">
+          <button
+            className={btnBack}
+            aria-expanded={openPanel === "also"}
+            onClick={() => toggle("also")}
+          >
+            {openPanel === "also"
+              ? "hide marks available elsewhere"
+              : `marks available elsewhere (${fb.alsoAvailable!.length})`}
+          </button>
+          {openPanel === "also" && (
+            <ul className="mt-2 list-disc pl-5 text-sm">
+              {fb.alsoAvailable!.map((a, i) => (
+                <li key={i} className="text-calm-ink my-1.5 leading-relaxed">
+                  {a}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Spelling has its own panel and never appears in the content feedback. */}
+      {(fb.spelling?.fixes.length ?? 0) > 0 && (
+        <div className="border-calm-line mt-3 border-t pt-3">
+          <button
+            className={btnBack}
+            aria-expanded={openPanel === "spelling"}
+            onClick={() => toggle("spelling")}
+          >
+            {openPanel === "spelling"
+              ? "hide spelling"
+              : fb.spelling!.marksAvailable > 0
+                ? `spelling: ${fb.spelling!.marksAvailable} mark${fb.spelling!.marksAvailable === 1 ? "" : "s"} available`
+                : "spelling"}
+          </button>
+          {openPanel === "spelling" && (
+            <ul className="mt-2 list-disc pl-5 text-sm">
+              {fb.spelling!.fixes.map((f, i) => (
+                <li key={i} className="text-calm-ink my-1.5">
+                  {f}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {fb.markSchemeWording && (
+        <div className="border-calm-line mt-3 border-t pt-3">
+          <button
+            className={btnBack}
+            aria-expanded={openPanel === "scheme"}
+            onClick={() => toggle("scheme")}
+          >
+            {openPanel === "scheme"
+              ? "hide the mark scheme wording"
+              : "show me the mark scheme wording"}
+          </button>
+          {openPanel === "scheme" && (
+            <p className="text-calm-soft mt-2 text-sm leading-relaxed">
+              {fb.markSchemeWording}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
