@@ -7,6 +7,12 @@ import type { Question, Sheet, SheetSummary } from "@/lib/revision-db";
 
 const BATCH = 4; // questions sent to the model at a time
 
+/* Words in the box before the hint button stops calling itself "I'm properly
+   stuck". A nudge rather than a lock: the button always opens on the first tap,
+   with no counter and no message, because a locked hint on a bad day means the
+   app gets closed, which costs more than a copied sentence. */
+const HINT_WORD_THRESHOLD = 20;
+
 type Screen = "sheets" | "create" | "pick" | "quiz" | "end";
 
 /* Tailwind class groups, named once so the markup below stays readable. */
@@ -60,7 +66,7 @@ export default function UmmmLessPanic() {
   const [flags, setFlags] = useState<Record<number, boolean>>({});
   const [queue, setQueue] = useState<number[]>([]);
   const [pos, setPos] = useState(0);
-  const [showHints, setShowHints] = useState(false);
+  const [hintsShown, setHintsShown] = useState(0);
   const [done, setDone] = useState<Record<number, boolean>>({});
 
   const [rawTitle, setRawTitle] = useState("");
@@ -233,7 +239,7 @@ export default function UmmmLessPanic() {
 
     setQueue(picked.length ? picked : all);
     setPos(0);
-    setShowHints(false);
+    setHintsShown(0);
     setDone({});
     setScreen("quiz");
   }
@@ -275,7 +281,7 @@ export default function UmmmLessPanic() {
         persist(idx, answers[idx] ?? "", false);
       }
     }
-    setShowHints(false);
+    setHintsShown(0);
     if (pos + 1 >= queue.length) setScreen("end");
     else setPos(pos + 1);
     window.scrollTo({ top: 0 });
@@ -553,21 +559,32 @@ section{margin-bottom:2rem;page-break-inside:avoid}
           )}
 
           <div className="mt-6">
-            <button className={btnQuiet} onClick={() => setShowHints(!showHints)}>
-              {showHints ? "Hide the nudge" : "Show me a nudge"}
-            </button>
-            {showHints && (
+            {hintsShown === 0 ? (
+              <button className={btnQuiet} onClick={() => setHintsShown(1)}>
+                {words >= HINT_WORD_THRESHOLD
+                  ? "Show me a nudge"
+                  : "I'm properly stuck"}
+              </button>
+            ) : (
               <div className="mt-4 border border-[#e3dde8] bg-[#f3f0f5] px-4 py-4">
                 <p className="text-calm-plum mb-2 text-sm">
                   Things you could use. You do not need all of them.
                 </p>
                 <ul className="list-disc pl-4 text-sm">
-                  {q.hints.map((h, i) => (
+                  {q.hints.slice(0, hintsShown).map((h, i) => (
                     <li key={i} className="my-1.5">
                       {h}
                     </li>
                   ))}
                 </ul>
+                {hintsShown < q.hints.length && (
+                  <button
+                    className={btnBack + " mt-3"}
+                    onClick={() => setHintsShown(hintsShown + 1)}
+                  >
+                    show me another
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -602,7 +619,7 @@ section{margin-bottom:2rem;page-break-inside:avoid}
               className={btnBack}
               onClick={() => {
                 setPos(pos - 1);
-                setShowHints(false);
+                setHintsShown(0);
               }}
             >
               back

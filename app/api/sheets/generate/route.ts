@@ -74,7 +74,7 @@ const SHEET_SCHEMA = {
             type: "array",
             items: { type: "string" },
             description:
-              "3 to 6 bullets of content she could use. Memory prompts, never a model answer.",
+              "4 to 7 fragments of content she could use, separated by the middle dot. Never sentences, because a sentence can be pasted.",
           },
         },
         required: ["label", "type", "prompt", "given", "shape", "hints"],
@@ -92,7 +92,13 @@ For each question:
 - prompt: the question itself, cleaned up. Keep the student's wording. Fix obvious typos in names.
 - given: any "you may use" or "in your answer" material, as one sentence. Empty string if there is none.
 - shape: 2 to 5 steps describing how to structure the answer, written as instructions to the student.
-- hints: 3 to 6 bullets of content the student could use. These are memory prompts, not a model answer. Never write the answer out. For judgement questions cover both sides, marking them "For:" and "Against:", and end with one line starting "A judgement to consider:".
+- hints: fragments, never sentences. Each carries a fact and cannot be pasted into an answer as it stands, because building the sentence is the work.
+
+  Wrong: "Imposed by Pope Innocent III in March 1208 after John refused to accept Stephen Langton as Archbishop of Canterbury."
+
+  Right: "Pope Innocent III · March 1208 · trigger was Langton refused as Archbishop"
+
+  Use the middle dot to separate parts. Keep names and dates in full, since those are the things worth recalling exactly. Four to seven fragments per question, ordered so the first is the most useful if she only opens one. For judgement questions, prefix with "For:" and "Against:" and end with one fragment starting "Judgement:".
 
 Writing rules, which matter:
 - No em dashes anywhere, and no dashes standing in for commas.
