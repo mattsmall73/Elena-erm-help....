@@ -3,14 +3,33 @@ import { UnlockForm } from "@/components/UnlockForm";
 /**
  * Where a request lands once the passcode is in.
  *
- * Only a path on this origin is allowed through. A value starting "//" would
- * be read as protocol-relative and send her off-site, so it is refused along
- * with anything that is not an absolute path.
+ * Checked by resolving rather than by blocklist. Refusing "//" and absolute
+ * URLs is not enough: browsers normalise a backslash to a forward slash, so
+ * "/\\evil.com" becomes protocol-relative and leaves the origin. Resolving the
+ * value against a throwaway origin and requiring it to still be there catches
+ * that and whatever else normalisation does, rather than the cases thought of
+ * in advance.
  */
+const PROBE_ORIGIN = "https://unlock.invalid";
+
 function safeNext(raw: string | string[] | undefined): string {
-  if (typeof raw !== "string") return "/";
-  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
-  return raw;
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > 512) {
+    return "/";
+  }
+  if (!raw.startsWith("/")) return "/";
+  try {
+    const resolved = new URL(raw, PROBE_ORIGIN);
+    if (resolved.origin !== PROBE_ORIGIN) return "/";
+    // Rebuild from the parsed parts so only a path and query survive, then
+    // check the result itself. Resolving "/..//evil.com" keeps the probe origin
+    // but yields the pathname "//evil.com", which is protocol-relative all over
+    // again, so the value handed back is what has to be verified.
+    const path = `${resolved.pathname}${resolved.search}`;
+    if (!path.startsWith("/") || path.startsWith("//")) return "/";
+    return path;
+  } catch {
+    return "/";
+  }
 }
 
 export default async function UnlockPage({

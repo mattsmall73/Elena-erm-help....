@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fredoka, Inter } from "next/font/google";
 import "./globals.css";
 import { ProfileProvider } from "@/components/ProfileProvider";
+import { GateNotice } from "@/components/GateNotice";
 
 const fredoka = Fredoka({
   variable: "--font-fredoka",
@@ -37,6 +38,7 @@ export default function RootLayout({
     >
       <body className="bg-base text-ink min-h-full flex flex-col font-body">
         <ProfileProvider>{children}</ProfileProvider>
+        <GateNotice />
       </body>
     </html>
   );

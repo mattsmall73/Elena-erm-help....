@@ -59,6 +59,38 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
+/**
+ * Warn once per process when production is running with no passcode.
+ *
+ * An unset passcode is a legitimate default, but a typo in the variable name
+ * fails exactly like a deliberate choice: everything open, nothing on screen,
+ * no error anywhere. So the state is announced rather than inferred, and any
+ * near-miss variable name is named too. Key names only; no values are logged.
+ */
+const KNOWN_VARS = new Set(["DOODLE_PASSCODE", "DOODLE_USER_ID"]);
+
+function nearMissNames(): string[] {
+  return Object.keys(process.env).filter(
+    (k) => !KNOWN_VARS.has(k) && (/PASS?C[O0]DE/i.test(k) || /^DOODLE/i.test(k)),
+  );
+}
+
+if (process.env.NODE_ENV === "production" && !process.env.DOODLE_PASSCODE) {
+  const suspects = nearMissNames();
+  console.warn(
+    "[doodle] DOODLE_PASSCODE is not set. Every page and every /api route is " +
+      "open to anyone with the URL, and /api/generate will spend the " +
+      "Anthropic credits on this key. Set DOODLE_PASSCODE to lock it, or " +
+      "ignore this if open is intended.",
+  );
+  if (suspects.length > 0) {
+    console.warn(
+      `[doodle] These variables look close to the expected name, so this may ` +
+        `be a typo rather than a choice: ${suspects.join(", ")}`,
+    );
+  }
+}
+
 const PASSCODE_SALT = "forgetful-doodle/passcode/v1";
 const MAX_PASSCODE_CHARS = 200;
 
