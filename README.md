@@ -148,6 +148,18 @@ export const GET = withSession(async (req, ctx, session) => { /* ... */ });
   one answer and coaches the one change that would raise it.
 - `lib/marking.ts` — the running grade and the mark line. Pure arithmetic: the
   grade is calculated here and never by the model.
+
+A sheet can be deleted from the list, behind a confirm that names what goes.
+Both child tables cascade, so its answers and marks go with it and there is no
+undo. Nothing else in either app destroys anything.
+
+When marking, her other answers on the same sheet are sent as reference only,
+fenced, capped at the ten most recent and truncated. The marker is told to read
+anything inside that fence as her writing rather than as instructions, never to
+mark or quote it, and to use it only to notice something she already knows that
+belongs in the answer being marked. Pointing out that she used something two
+questions ago is the most encouraging correction available, because it means
+she knew it.
 - `lib/revision-db.ts` — its database access, separate from `lib/db.ts` so
   fixing one app cannot break the other. Same client, same `POSTGRES_URL`.
 

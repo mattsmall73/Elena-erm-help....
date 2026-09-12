@@ -112,6 +112,8 @@ export default function UmmmLessPanic() {
   const [marks, setMarks] = useState<Record<number, MarkRecord>>({});
   const [marking, setMarking] = useState(false);
   const [openPanel, setOpenPanel] = useState<string>("");
+  const [confirmDelete, setConfirmDelete] = useState<string>("");
+  const [deleting, setDeleting] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -178,7 +180,33 @@ export default function UmmmLessPanic() {
     void loadSheets();
   }, [loadSheets]);
 
+  /* Deletes a sheet and everything written on it. Both child tables cascade,
+     so the answers and the marks go with it. Behind a confirm that names what
+     goes, because there is no undo and nothing else in the app destroys
+     anything. */
+  async function removeSheet(id: string) {
+    if (deleting) return;
+    setDeleting(true);
+    setError("");
+    setSeedNote("");
+    try {
+      const res = await fetch(`/api/sheets/${id}`, { method: "DELETE" });
+      const out = await readResponse<{ ok: boolean }>(res);
+      if (!out.ok) {
+        setError(out.error);
+        return;
+      }
+      setConfirmDelete("");
+      await loadSheets();
+    } catch {
+      setError("Couldn't reach the app to delete that. Check your connection?");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function openSheet(id: string) {
+    setConfirmDelete("");
     setLoading(true);
     const res = await fetch(`/api/sheets/${id}`);
     const out = await readResponse<{
@@ -468,17 +496,59 @@ section{margin-bottom:2rem;page-break-inside:avoid}
 
         <div className="border-calm-line mb-6 border-t">
           {sheets.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => void openSheet(s.id)}
-              className="border-calm-line hover:bg-calm-card block w-full border-b px-1 py-4 text-left"
-            >
-              <span className="font-read block text-xl">{s.title}</span>
-              <span className="text-calm-soft mt-0.5 block text-sm">
-                {s.subject ? s.subject + " · " : ""}
-                {s.question_count} questions
-              </span>
-            </button>
+            <div key={s.id} className="border-calm-line border-b">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => void openSheet(s.id)}
+                  className="hover:bg-calm-card flex-1 px-1 py-4 text-left"
+                >
+                  <span className="font-read block text-xl">{s.title}</span>
+                  <span className="text-calm-soft mt-0.5 block text-sm">
+                    {s.subject ? s.subject + " · " : ""}
+                    {s.question_count} questions
+                  </span>
+                </button>
+                {confirmDelete !== s.id && (
+                  <button
+                    onClick={() => setConfirmDelete(s.id)}
+                    className={btnBack + " shrink-0 px-2"}
+                    aria-label={`Delete ${s.title}`}
+                  >
+                    delete
+                  </button>
+                )}
+              </div>
+
+              {confirmDelete === s.id && (
+                <div
+                  role="alertdialog"
+                  aria-label={`Delete ${s.title}?`}
+                  className="border-[#e6cfcf] bg-[#f7eded] mb-4 border px-4 py-3"
+                >
+                  <p className="text-[#8a3b3b] mb-3 text-sm">
+                    Delete {s.title}? Its {s.question_count} questions go, and so
+                    does anything you have written or had marked on it. There is
+                    no undo.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      className={btnQuiet}
+                      disabled={deleting}
+                      onClick={() => setConfirmDelete("")}
+                    >
+                      Keep it
+                    </button>
+                    <button
+                      className="rounded-sm border border-[#8a3b3b] bg-[#8a3b3b] px-5 py-2 text-[#f7eded] hover:bg-[#7a3333] disabled:opacity-50"
+                      disabled={deleting}
+                      onClick={() => void removeSheet(s.id)}
+                    >
+                      {deleting ? "deleting…" : "Delete it"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
           {!loading && sheets.length === 0 && (
             <div className="py-4">

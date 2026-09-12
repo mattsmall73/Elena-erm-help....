@@ -249,7 +249,52 @@ export async function saveMark(
   `;
 }
 
-/** One question and her answer to it, which is all the marker ever sees. */
+/** One question and her answer to it. */
+export interface OtherAnswer {
+  questionIndex: number;
+  prompt: string;
+  answer: string;
+}
+
+/**
+ * Her other answers on the same sheet, most recently written first.
+ *
+ * Sent to the marker as reference only, so it can notice knowledge she already
+ * has and has not used in the answer being marked. Pointing out that she used
+ * something two questions ago is the most encouraging correction available,
+ * because it means she knew it.
+ *
+ * Capped and truncated: ten answers keeps the request bounded, and recency is
+ * the right order because the sheet she is working through now is the one she
+ * is most likely to be able to reuse.
+ */
+export async function listOtherAnswers(
+  sheetId: string,
+  excludeIndex: number,
+  limit = 10,
+  maxChars = 1200,
+): Promise<OtherAnswer[]> {
+  const res = await sql`
+    SELECT a.question_index,
+           COALESCE(s.questions -> a.question_index ->> 'prompt', '') AS prompt,
+           left(a.answer, ${maxChars}) AS answer
+    FROM revision_answer a
+    JOIN revision_sheet s ON s.id = a.sheet_id AND s.user_id = a.user_id
+    WHERE a.sheet_id = ${sheetId}
+      AND a.user_id = ${USER_ID}
+      AND a.question_index <> ${excludeIndex}
+      AND length(trim(a.answer)) > 0
+    ORDER BY a.updated_at DESC
+    LIMIT ${limit};
+  `;
+  return res.rows.map((r) => ({
+    questionIndex: r.question_index as number,
+    prompt: r.prompt as string,
+    // Already truncated in SQL; sliced again so the cap holds if that changes.
+    answer: (r.answer as string).slice(0, maxChars),
+  }));
+}
+
 export async function getAnswerForMarking(
   sheetId: string,
   questionIndex: number,
