@@ -76,10 +76,29 @@ Set `DOODLE_PASSCODE` and every page and every `/api` route requires it. It is
 entered once per device on `/unlock` and kept in a signed, `httpOnly` cookie for
 a year.
 
-Leave it unset and everything is open to anyone with the URL, which is how the
-app behaved before the gate existed and how it stays convenient locally. Set it
-in production, because an open `/api/generate` is also a way for a stranger to
-spend the credits on your API key.
+**It is deliberately unset right now, and that is a decision rather than an
+oversight.** The gate is built, tested and working; the apps are open because
+only Elena has the link and the data is flashcards, scores and a streak count.
+Turning it on is one line:
+
+```bash
+# in the Vercel project's environment variables
+DOODLE_PASSCODE=some-long-passphrase-she-will-remember
+```
+
+Then redeploy. She enters it once per device and the apps behave exactly as they
+do now. Nothing else changes.
+
+Reasons to turn it on later: a custom domain, since the domain name lands in
+public Certificate Transparency logs and becomes discoverable in a way a
+`*.vercel.app` subdomain does not; or Anthropic billing showing calls you cannot
+account for, since an open `/api/generate` and `/api/sheets/generate` are both
+ways for a stranger to spend the credits on your key.
+
+While it is off, production logs a warning at boot and every page shows a small
+amber "No passcode set" pill, so the open state is visible rather than assumed.
+A typo in the variable name reports as a probable typo rather than reading as a
+deliberate choice.
 
 Two things worth knowing:
 
@@ -130,15 +149,26 @@ export const GET = withSession(async (req, ctx, session) => { /* ... */ });
   fixing one app cannot break the other. Same client, same `POSTGRES_URL`.
 
 Two tables of its own, `revision_sheet` and `revision_answer`. Nothing
-Forgetful Doodle uses is touched. Create and seed them once:
+Forgetful Doodle uses is touched.
 
-```bash
-node --env-file=.env.local scripts/init-revision-db.mjs
-node --env-file=.env.local scripts/seed-history.mjs
-```
+**Setting it up needs no terminal.** Two steps:
 
-Both are safe to run again. The table creation is wrapped in a transaction, so
-a failure halfway leaves the database as it was.
+1. Paste `scripts/schema.sql` into the Neon console SQL editor and run it. It
+   creates both tables and prints them back so you can see it worked. Safe to
+   run again; every statement is guarded.
+2. Open `/ummm-less-panic` and press **Load the history sheet**. The 39
+   questions ship as a static file and go in through the same create route a
+   hand-built sheet uses, so they are validated on the way like anything else.
+   The button only appears while there are no sheets, so it cannot be pressed
+   twice by accident.
+
+`revision_answer.sheet_id` references the sheet and cascades on delete, so
+answers cannot outlive the sheet they belong to and a sheet id that does not
+exist cannot have answers written against it. Deleting a sheet is one
+statement as a result.
+
+If you do have a terminal with the connection string, `node --env-file=.env.local
+scripts/init-revision-db.mjs` does the same as step 1.
 
 **The hints on a generated sheet come from a model, so they can be wrong.** It
 is told to leave out anything it is unsure of rather than guess, and that mostly

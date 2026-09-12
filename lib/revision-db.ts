@@ -1,4 +1,4 @@
-import { db, sql } from "@vercel/postgres";
+import { sql } from "@vercel/postgres";
 import { USER_ID } from "./user";
 
 /* Deliberately a separate file from lib/db.ts so that fixing one app
@@ -108,25 +108,10 @@ export async function saveAnswer(
   `;
 }
 
-/* The only place in this app that deletes anything, and the only place
-   that needs more than one statement. If the second delete fails, the
-   first is rolled back, so a sheet cannot end up with its questions
-   gone and its answers stranded. */
+/* One statement, because revision_answer.sheet_id cascades on delete. The
+   database removes the answers with the sheet, so there is no window in which
+   the questions are gone and the answers are stranded, and no transaction
+   needed to close one. */
 export async function deleteSheet(id: string) {
-  const client = await db.connect();
-  try {
-    await client.sql`BEGIN`;
-    await client.sql`DELETE FROM revision_answer WHERE sheet_id = ${id} AND user_id = ${USER_ID};`;
-    await client.sql`DELETE FROM revision_sheet  WHERE id = ${id}       AND user_id = ${USER_ID};`;
-    await client.sql`COMMIT`;
-  } catch (err) {
-    try {
-      await client.sql`ROLLBACK`;
-    } catch {
-      /* connection already gone, nothing to roll back against */
-    }
-    throw err;
-  } finally {
-    client.release();
-  }
+  await sql`DELETE FROM revision_sheet WHERE id = ${id} AND user_id = ${USER_ID};`;
 }

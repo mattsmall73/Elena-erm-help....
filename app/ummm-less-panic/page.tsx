@@ -69,6 +69,7 @@ export default function UmmmLessPanic() {
   const [building, setBuilding] = useState(false);
   const [progress, setProgress] = useState("");
   const [pupilName, setPupilName] = useState("");
+  const [seeding, setSeeding] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -84,6 +85,44 @@ export default function UmmmLessPanic() {
     }
     setLoading(false);
   }, []);
+
+  /* Sets up the history sheet without a terminal: the questions ship as a
+     static file and go in through the same create route a hand-built sheet
+     uses, so they are validated on the way like anything else. Only offered
+     while there are no sheets, so it cannot be pressed twice by accident. */
+  const loadHistorySheet = useCallback(async () => {
+    setSeeding(true);
+    setError("");
+    try {
+      const fileRes = await fetch("/richard-and-john.json", { cache: "no-store" });
+      const file = await readResponse<{
+        title: string;
+        subject: string;
+        questions: Question[];
+      }>(fileRes);
+      if (!file.ok) {
+        setError(file.error);
+        return;
+      }
+
+      const saveRes = await fetch("/api/sheets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(file.data),
+      });
+      const saved = await readResponse<{ id: string }>(saveRes);
+      if (!saved.ok) {
+        setError(saved.error);
+        return;
+      }
+
+      await loadSheets();
+    } catch {
+      setError("Couldn't load the history sheet. Check your connection?");
+    } finally {
+      setSeeding(false);
+    }
+  }, [loadSheets]);
 
   useEffect(() => {
     void loadSheets();
@@ -338,7 +377,19 @@ section{margin-bottom:2rem;page-break-inside:avoid}
             </button>
           ))}
           {!loading && sheets.length === 0 && (
-            <p className="text-calm-soft py-4 text-sm">No sheets yet. Make the first one.</p>
+            <div className="py-4">
+              <p className="text-calm-soft mb-4 text-sm">
+                No sheets yet. Load the history one to get going, or make your own
+                from questions you have been given.
+              </p>
+              <button
+                className={btnQuiet}
+                disabled={seeding}
+                onClick={() => void loadHistorySheet()}
+              >
+                {seeding ? "Loading it in…" : "Load the history sheet"}
+              </button>
+            </div>
           )}
         </div>
 
