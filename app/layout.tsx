@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Fredoka, Inter } from "next/font/google";
+import { Fredoka, Inter, Newsreader } from "next/font/google";
 import "./globals.css";
 import { ProfileProvider } from "@/components/ProfileProvider";
+import { GateNotice } from "@/components/GateNotice";
 
 const fredoka = Fredoka({
   variable: "--font-fredoka",
@@ -12,6 +13,14 @@ const fredoka = Fredoka({
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+});
+
+// Reading face for Ummm Less Panic, which asks her to read a question and then
+// write two or three paragraphs. A serif carries that length better than Inter.
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -33,10 +42,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fredoka.variable} ${inter.variable} h-full antialiased`}
+      className={`${fredoka.variable} ${inter.variable} ${newsreader.variable} h-full antialiased`}
     >
       <body className="bg-base text-ink min-h-full flex flex-col font-body">
         <ProfileProvider>{children}</ProfileProvider>
+        <GateNotice />
       </body>
     </html>
   );

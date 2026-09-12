@@ -21,9 +21,20 @@
   --color-ink: #f2f0ff;
   --color-muted: #a79fce;
 
+  /* Calm surfaces, used only by Ummm Less Panic */
+  --color-calm-page: #edebf1;
+  --color-calm-card: #fbfafc;
+  --color-calm-ink: #23212e;
+  --color-calm-soft: #615f70;
+  --color-calm-line: #d6d3de;
+  --color-calm-plum: #6d4e76;
+  --color-calm-moss: #4c6b58;
+
   /* Fonts */
   --font-display: var(--font-fredoka);
   --font-body: var(--font-inter);
+  /* Reading face for the long answers in Ummm Less Panic */
+  --font-read: var(--font-newsreader);
 }
 
 html {
@@ -187,4 +198,30 @@ html.comfort body {
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(167, 159, 206, 0.35) transparent;
+}
+
+/* Landing page title. Each letter animates on its own delay, set inline in
+   app/page.tsx. */
+.wave-letter {
+  display: inline-block;
+  transform-origin: 50% 80%;
+  animation: wave-letter 2.6s ease-in-out infinite;
+}
+
+@keyframes wave-letter {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25%      { transform: translateY(-0.14em) rotate(-3deg); }
+  50%      { transform: translateY(0) rotate(0deg); }
+  75%      { transform: translateY(0.1em) rotate(3deg); }
+}
+
+/* Ummm Less Panic opts out of the forced dark scheme so text areas,
+   scrollbars and autofill render light. Without this the answer boxes get
+   dark chrome on a light card. */
+.calm-surface {
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave-letter { animation: none; }
 }

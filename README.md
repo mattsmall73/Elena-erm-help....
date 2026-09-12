@@ -1,3 +1,18 @@
+# Elena's Apps
+
+Two revision apps behind one menu, sharing a stack, a database and a passcode.
+
+- **`/`** — the menu.
+- **`/forgetful-doodle`** — Forgetful Doodle 2.0, below. Fast competitive recall.
+- **`/ummm-less-panic`** — Ummm Less Panic. Written exam questions, one at a
+  time, with an answer structure and memory prompts. Light surface, serif
+  reading face, nothing timed and nothing scored.
+
+The arcade used to sit at the root. It moved to `/forgetful-doodle` so the menu
+could have that address, and the old link now lands on the menu.
+
+---
+
 # Forgetful Doodle 2.0 — _for Elena_
 
 Fast, competitive active recall — the warm-up before the formal work. One card at
@@ -52,6 +67,54 @@ Copy `.env.example` to `.env.local` and fill in what you want:
 - `POSTGRES_URL` — enables cross-device persistence of best scores, day streak
   and custom decks. Provided automatically when a Vercel Postgres store is
   linked.
+- `DOODLE_PASSCODE` — locks the app. See below. Leave it unset locally.
+- `DOODLE_USER_ID` — which profile to read and write. Defaults to `elena`.
+
+## The passcode
+
+Set `DOODLE_PASSCODE` and every page and every `/api` route requires it. It is
+entered once per device on `/unlock` and kept in a signed, `httpOnly` cookie for
+a year.
+
+**It is deliberately unset right now, and that is a decision rather than an
+oversight.** The gate is built, tested and working; the apps are open because
+only Elena has the link and the data is flashcards, scores and a streak count.
+Turning it on is one line:
+
+```bash
+# in the Vercel project's environment variables
+DOODLE_PASSCODE=some-long-passphrase-she-will-remember
+```
+
+Then redeploy. She enters it once per device and the apps behave exactly as they
+do now. Nothing else changes.
+
+Reasons to turn it on later: a custom domain, since the domain name lands in
+public Certificate Transparency logs and becomes discoverable in a way a
+`*.vercel.app` subdomain does not; or Anthropic billing showing calls you cannot
+account for, since an open `/api/generate` and `/api/sheets/generate` are both
+ways for a stranger to spend the credits on your key.
+
+While it is off, production logs a warning at boot and every page shows a small
+amber "No passcode set" pill, so the open state is visible rather than assumed.
+A typo in the variable name reports as a probable typo rather than reading as a
+deliberate choice.
+
+Two things worth knowing:
+
+- **Changing it signs every device out.** The cookie is signed with a key
+  derived from the passcode, so rotating one invalidates the other.
+- **Make it long.** A failed attempt costs CPU by design, since a serverless
+  function has nowhere to count attempts. That raises the cost of guessing
+  rather than removing it.
+
+`proxy.ts` turns unauthenticated traffic away early, and every route also checks
+for itself through `withSession` in `lib/session.ts`. A new route gets the first
+layer automatically and should be written with the second:
+
+```ts
+export const GET = withSession(async (req, ctx, session) => { /* ... */ });
+```
 
 ## Deploy (Vercel)
 
@@ -59,7 +122,9 @@ Copy `.env.example` to `.env.local` and fill in what you want:
 2. Add a **Postgres** store to the project (Storage tab) — it sets `POSTGRES_URL`.
    The schema is created automatically on first request.
 3. Add the `ANTHROPIC_API_KEY` environment variable.
-4. Deploy.
+4. Add `DOODLE_PASSCODE`. Without it the deployment is open to anyone with
+   the URL.
+5. Deploy.
 
 ## Project layout
 
@@ -68,9 +133,53 @@ Copy `.env.example` to `.env.local` and fill in what you want:
 - `components/` — `Arcade`, `Round` (the game loop), `ProfileProvider` (state +
   localStorage/server sync).
 - `lib/` — `round.ts` (pure game engine), `seed-decks.ts`, `subjects.ts`,
-  `types.ts`, `db.ts` (Vercel Postgres).
+  `types.ts`, `db.ts` (Vercel Postgres), `session-token.ts` (pure passcode and
+  cookie signing), `session.ts` (cookies and the `withSession` wrapper),
+  `profile-merge.ts` (local/server reconcile), `validate-profile.ts` (incoming
+  body checks), `downscale-image.ts` (shrinks a photo before upload),
+  `safe-json.ts` (reads a response body as text before parsing), `user.ts`.
+- `proxy.ts` — the passcode gate, in front of every route.
+
+### Ummm Less Panic
+
+- `app/ummm-less-panic/page.tsx` — the whole app.
+- `app/api/sheets/` — list and create, open and delete, save an answer, and
+  `generate` which turns pasted questions into cards.
+- `lib/revision-db.ts` — its database access, separate from `lib/db.ts` so
+  fixing one app cannot break the other. Same client, same `POSTGRES_URL`.
+
+Two tables of its own, `revision_sheet` and `revision_answer`. Nothing
+Forgetful Doodle uses is touched.
+
+**Setting it up needs no terminal.** Two steps:
+
+1. Paste `scripts/schema.sql` into the Neon console SQL editor and run it. It
+   creates both tables and prints them back so you can see it worked. Safe to
+   run again; every statement is guarded.
+2. Open `/ummm-less-panic` and press **Load the history sheet**. The 39
+   questions ship as a static file and go in through the same create route a
+   hand-built sheet uses, so they are validated on the way like anything else.
+   The button only appears while there are no sheets, so it cannot be pressed
+   twice by accident.
+
+`revision_answer.sheet_id` references the sheet and cascades on delete, so
+answers cannot outlive the sheet they belong to and a sheet id that does not
+exist cannot have answers written against it. Deleting a sheet is one
+statement as a result.
+
+If you do have a terminal with the connection string, `node --env-file=.env.local
+scripts/init-revision-db.mjs` does the same as step 1.
+
+**The hints on a generated sheet come from a model, so they can be wrong.** It
+is told to leave out anything it is unsure of rather than guess, and that mostly
+holds. Where a wrong date costs marks, check a surprise against your notes. The
+sheet is a prompt, not gospel.
 
 ## Privacy
 
 Single user — no accounts, no leaderboards against other people (the opponent is
 always your past self). What's done in the app stays in the app.
+
+The passcode is not an account. There is no email, no username and no profile
+beyond flashcards, scores and a streak count. One passcode, one profile, shared
+by whichever devices hold it.

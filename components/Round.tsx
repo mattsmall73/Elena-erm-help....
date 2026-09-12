@@ -117,7 +117,7 @@ export function Round({ deck }: { deck: Deck }) {
       {/* Top bar */}
       <div className="flex items-center justify-between">
         <Link
-          href="/"
+          href="/forgetful-doodle"
           className="text-muted hover:text-ink text-sm transition-colors"
         >
           ← Arcade
@@ -417,7 +417,7 @@ function Finish({
             Go again
           </button>
           <Link
-            href="/"
+            href="/forgetful-doodle"
             className="border-white/15 text-ink hover:border-white/30 flex items-center justify-center rounded-2xl border px-6 py-4 font-display text-lg font-600 transition-all"
           >
             Arcade

@@ -23,6 +23,15 @@ export function Arcade() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 pb-24 pt-8 sm:pt-12">
+      {/* Back to the menu. Its own row so the header's two columns keep their
+          layout, and the same wording and arrow the revision app uses. */}
+      <Link
+        href="/"
+        className="text-muted hover:text-ink mb-5 inline-block text-sm transition-colors"
+      >
+        &larr; Elena&apos;s Apps
+      </Link>
+
       {/* Header */}
       <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-2">

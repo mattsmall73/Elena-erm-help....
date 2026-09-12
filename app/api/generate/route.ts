@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSubject } from "@/lib/subjects";
+import { withSession } from "@/lib/session";
 
 // Deck generation runs Claude Sonnet 5 through this serverless proxy so the
 // API key stays server-side. Model per the brief.
@@ -59,7 +60,9 @@ function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
-export async function POST(req: Request) {
+// Gated as well as /api/state: an open generate route is a way for a stranger
+// to spend the Anthropic credits on this key.
+export const POST = withSession(async (req) => {
   let body: GenerateBody;
   try {
     body = (await req.json()) as GenerateBody;
@@ -178,7 +181,7 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
-}
+});
 
 function parseDataUrl(
   dataUrl: string,
