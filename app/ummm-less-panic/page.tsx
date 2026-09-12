@@ -7,6 +7,7 @@ import { SEED_SHEET } from "@/lib/seed-sheet";
 import {
   GRADE_MIN_MARKED,
   bulkSummary,
+  costEstimate,
   gradeLabel,
   markLine,
   movement,
@@ -136,12 +137,17 @@ export default function UmmmLessPanic() {
   const [markAllDone, setMarkAllDone] = useState(0);
   const [markAllTotal, setMarkAllTotal] = useState(0);
   const [markAllNote, setMarkAllNote] = useState("");
+  const [markAllFailed, setMarkAllFailed] = useState<number[]>([]);
   const [openPanel, setOpenPanel] = useState<string>("");
   const [confirmDelete, setConfirmDelete] = useState<string>("");
   const [deleting, setDeleting] = useState(false);
 
   const barRef = useRef<HTMLElement | null>(null);
   const stopMarkAll = useRef(false);
+  /* Synchronous, unlike the markingAll state behind it. Two presses landing
+     before React re-renders would both read markingAll as false and start a
+     second run over the same answers, paying for every one of them twice. */
+  const markAllRunning = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSave = useRef<{
     index: number;
@@ -336,15 +342,17 @@ export default function UmmmLessPanic() {
   /* Marks the lot, a couple at a time, landing each result as it arrives so
      the page fills in rather than sitting blank. Stoppable, because a run of
      thirty is minutes long and nothing about it should feel like a commitment. */
-  async function markEverything() {
-    if (!sheet || marking || markingAll) return;
+  async function markEverything(only?: number[]) {
+    if (!sheet || marking || markAllRunning.current) return;
+    markAllRunning.current = true;
 
-    const queued = markableNow();
+    const queued = only ?? markableNow();
     const blank = sheet.questions.filter(
       (_, i) => countWords(answers[i] ?? "") < MARK_MIN_WORDS,
     ).length;
 
     if (queued.length === 0) {
+      markAllRunning.current = false;
       setMarkAllNote(
         bulkSummary({ marked: 0, movedUp: 0, words: 0, failed: 0, stopped: false, blank }),
       );
@@ -354,6 +362,7 @@ export default function UmmmLessPanic() {
     stopMarkAll.current = false;
     setError("");
     setMarkAllNote("");
+    setMarkAllFailed([]);
     setMarkingAll(true);
     setMarkAllDone(0);
     setMarkAllTotal(queued.length);
@@ -362,7 +371,7 @@ export default function UmmmLessPanic() {
     let marked = 0;
     let movedUp = 0;
     let words = 0;
-    let failed = 0;
+    const failedAt: number[] = [];
     let finished = 0;
     let lastError = "";
 
@@ -381,7 +390,10 @@ export default function UmmmLessPanic() {
             movedUp += 1;
           }
         } else if (!out.ok) {
-          failed += 1;
+          // Kept by index rather than counted, so the ones that dropped can be
+          // re-run on their own. After twenty answers she will not remember
+          // which four failed, and nothing else on screen would tell her.
+          failedAt.push(idx);
           lastError = out.error;
         }
         finished += 1;
@@ -394,12 +406,21 @@ export default function UmmmLessPanic() {
     );
 
     setMarkingAll(false);
+    markAllRunning.current = false;
+    setMarkAllFailed(failedAt);
     setMarkAllNote(
-      bulkSummary({ marked, movedUp, words, failed, stopped: stopMarkAll.current, blank }),
+      bulkSummary({
+        marked,
+        movedUp,
+        words,
+        failed: failedAt.length,
+        stopped: stopMarkAll.current,
+        blank,
+      }),
     );
     // One message for the whole run, and only when nothing at all came back,
     // so a single dropped call does not read as a broken app.
-    if (marked === 0 && failed > 0) setError(lastError);
+    if (marked === 0 && failedAt.length > 0) setError(lastError);
   }
 
   async function buildSheet() {
@@ -868,8 +889,10 @@ section{margin-bottom:2rem;page-break-inside:avoid}
           done={markAllDone}
           total={markAllTotal}
           note={markAllNote}
+          failed={markAllFailed.length}
           busy={marking}
           onStart={() => void markEverything()}
+          onRetry={() => void markEverything(markAllFailed)}
           onStop={() => {
             stopMarkAll.current = true;
           }}
@@ -1128,8 +1151,10 @@ section{margin-bottom:2rem;page-break-inside:avoid}
           done={markAllDone}
           total={markAllTotal}
           note={markAllNote}
+          failed={markAllFailed.length}
           busy={marking}
           onStart={() => void markEverything()}
+          onRetry={() => void markEverything(markAllFailed)}
           onStop={() => {
             stopMarkAll.current = true;
           }}
@@ -1220,18 +1245,22 @@ function MarkAllPanel({
   done,
   total,
   note,
+  failed,
   busy,
   onStart,
   onStop,
+  onRetry,
 }: {
   ready: number;
   running: boolean;
   done: number;
   total: number;
   note: string;
+  failed: number;
   busy: boolean;
   onStart: () => void;
   onStop: () => void;
+  onRetry: () => void;
 }) {
   return (
     <div className="border-calm-line mb-6 border-t pt-5">
@@ -1256,13 +1285,20 @@ function MarkAllPanel({
           <p className="text-calm-soft mt-2 text-sm">
             {ready === 0
               ? "Everything you have written already has its marking."
-              : ready === 1
-                ? "One answer is ready. Anything still blank is skipped."
-                : `${ready} answers are ready. Anything still blank is skipped.`}
+              : `${ready === 1 ? "One answer is" : `${ready} answers are`} ready. ` +
+                `Anything still blank is skipped. Costs ${costEstimate(ready)}.`}
           </p>
         </>
       )}
       {note && <p className="font-read text-calm-ink mt-4">{note}</p>}
+      {/* Named as a control rather than as advice. After a long run she has no
+          way of knowing which ones dropped, and going to find them one at a
+          time is not a thing anyone does. */}
+      {!running && failed > 0 && (
+        <button className={btnQuiet + " mt-3"} disabled={busy} onClick={onRetry}>
+          {failed === 1 ? "Try that one again" : `Try those ${failed} again`}
+        </button>
+      )}
     </div>
   );
 }
@@ -1298,6 +1334,25 @@ function GradeStrip({
   );
 }
 
+/* Feedback text, rendered as the paragraphs it was written as.
+
+   The marking prompt makes three lines per paragraph a hard rule and asks for a
+   blank line between each. In one <p> those blank lines collapse to a space, so
+   the model would obey the rule and the screen would still show a block. Nothing
+   would fail; it would just quietly not work. */
+function Paragraphs({ text, className = "" }: { text: string; className?: string }) {
+  const paras = text.split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean);
+  return (
+    <>
+      {paras.map((t, i) => (
+        <p key={i} className={className + (i > 0 ? " mt-3" : "")}>
+          {t}
+        </p>
+      ))}
+    </>
+  );
+}
+
 function MarkPanel({
   record,
   openPanel,
@@ -1328,38 +1383,39 @@ function MarkPanel({
 
   return (
     <div className="border-calm-line bg-calm-card mt-5 border px-4 py-4">
-      {line && (
-        <p className="font-read text-calm-ink mb-1 text-xl">
-          {line}
-          {fb.levelWording ? (
-            <span className="text-calm-soft font-body block text-sm">
-              {fb.levelWording}
-            </span>
-          ) : null}
-        </p>
+      {line && <p className="font-read text-calm-ink text-xl">{line}</p>}
+      {fb.levelWording && (
+        <p className="text-calm-soft mt-2 text-sm">{fb.levelWording}</p>
       )}
 
       {moved && (
-        <p className="text-calm-moss mb-3 text-sm font-medium">{moved}</p>
+        <p className="text-calm-moss mt-3 text-sm font-medium">{moved}</p>
       )}
 
       {fb.workingWell && (
         <div className="mt-4">
           <h3 className="text-calm-plum mb-1 text-sm font-medium">Working</h3>
-          <p className="text-calm-ink text-sm leading-relaxed">{fb.workingWell}</p>
+          <Paragraphs
+            text={fb.workingWell}
+            className="text-calm-ink text-sm leading-relaxed"
+          />
         </div>
       )}
 
       {fb.oneChange?.observation && (
         <div className="mt-4">
           <h3 className="text-calm-plum mb-1 text-sm font-medium">Change this</h3>
-          <p className="text-calm-ink text-sm leading-relaxed">
-            {fb.oneChange.observation}
-          </p>
+          <Paragraphs
+            text={fb.oneChange.observation}
+            className="text-calm-ink text-sm leading-relaxed"
+          />
           {fb.oneChange.why && (
-            <p className="text-calm-ink mt-2 text-sm leading-relaxed">
-              {fb.oneChange.why}
-            </p>
+            <div className="mt-3">
+              <Paragraphs
+                text={fb.oneChange.why}
+                className="text-calm-ink text-sm leading-relaxed"
+              />
+            </div>
           )}
           {fb.oneChange.task && (
             <p className="border-calm-plum/40 text-calm-ink mt-3 border-l-2 pl-3 text-sm">

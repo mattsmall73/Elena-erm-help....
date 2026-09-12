@@ -181,16 +181,16 @@ export function bulkSummary(o: BulkOutcome): string {
       parts.push("Stopped before anything was marked.");
     } else if (o.failed > 0) {
       parts.push(
-        o.failed === 1
-          ? "That one did not come back. Worth trying it again."
-          : "None of them came back. Worth trying again in a minute.",
+        o.failed === 1 ? "That one did not come back." : "None of them came back.",
       );
     } else {
       parts.push("Nothing new to mark. Everything you have written already has its marking.");
     }
   } else {
+    // The word count leads. It is the biggest true number here and it is hers,
+    // where the count of answers is closer to a tally of what got processed.
     const n = o.marked === 1 ? "1 answer marked" : `${o.marked} answers marked`;
-    parts.push(`${n}, ${o.words.toLocaleString("en-GB")} words of your own writing.`);
+    parts.push(`${o.words.toLocaleString("en-GB")} words of your own writing, ${n}.`);
   }
 
   if (o.movedUp > 0) {
@@ -210,18 +210,36 @@ export function bulkSummary(o: BulkOutcome): string {
   if (o.marked > 0 && o.failed > 0) {
     parts.push(
       o.failed === 1
-        ? "One did not come back. Worth trying that one again."
-        : `${o.failed} did not come back. Worth trying those again.`,
+        ? "One did not come back."
+        : `${o.failed} did not come back.`,
     );
   }
 
   if (o.blank > 0) {
+    // Stated and left alone. "There whenever you want them" was one clause too
+    // kind, and a kind clause is what draws the eye to what is not done.
     parts.push(
       o.blank === 1
-        ? "One question is still blank, there whenever you want it."
-        : `${o.blank} questions are still blank, there whenever you want them.`,
+        ? "One question is still blank."
+        : `${o.blank} questions are still blank.`,
     );
   }
 
   return parts.join(" ");
+}
+
+/**
+ * Rough cost of marking one answer, in pence.
+ *
+ * Measured from the request rather than guessed: about 3,000 tokens of system
+ * prompt, up to 3,200 of her other answers as reference and a few hundred of
+ * her own, against a couple of thousand out with thinking, at Opus 4.8 rates.
+ * Shown to her as a fact before she presses, because a button that spends money
+ * should say so, and an estimate she can see beats a cap she cannot.
+ */
+export const PENCE_PER_MARK = 8;
+
+export function costEstimate(answers: number): string {
+  const pence = answers * PENCE_PER_MARK;
+  return pence < 100 ? `about ${pence}p` : `about £${(pence / 100).toFixed(2)}`;
 }
