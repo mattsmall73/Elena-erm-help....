@@ -12,6 +12,8 @@ import {
   markLine,
   movement,
   needsMarking,
+  pillLabel,
+  pillState,
   runningGrade,
   type StoredMark,
 } from "@/lib/marking";
@@ -120,7 +122,6 @@ export default function UmmmLessPanic() {
   const [queue, setQueue] = useState<number[]>([]);
   const [pos, setPos] = useState(0);
   const [hintsShown, setHintsShown] = useState(0);
-  const [done, setDone] = useState<Record<number, boolean>>({});
 
   const [rawTitle, setRawTitle] = useState("");
   const [rawSubject, setRawSubject] = useState("");
@@ -263,7 +264,6 @@ export default function UmmmLessPanic() {
       const byIndex: Record<number, MarkRecord> = {};
       for (const m of out.data.marks ?? []) byIndex[m.questionIndex] = m;
       setMarks(byIndex);
-      setDone({});
       setError("");
       setMarkAllNote("");
       setScreen("pick");
@@ -507,7 +507,6 @@ export default function UmmmLessPanic() {
     setQueue(picked.length ? picked : all);
     setPos(0);
     setHintsShown(0);
-    setDone({});
     setScreen("quiz");
   }
 
@@ -552,10 +551,10 @@ export default function UmmmLessPanic() {
     sendSave();
   }
 
-  /* Move to another question in the run without judging the one being left:
-     nothing is marked done and nothing is parked. That is what the bar at the
-     top and the previous and next links do. Done and Come back to this, at the
-     bottom, are the ones that record a decision. */
+  /* Move to another question in the run without parking the one being left.
+     That is what the bar at the top and the previous and next links do.
+     Come back to this, at the bottom, is now the only control that records a
+     decision; Done moves on and clears a park, and nothing else. */
   function goTo(next: number) {
     if (next === pos || next < 0 || next >= queue.length) return;
     flushSave();
@@ -582,7 +581,9 @@ export default function UmmmLessPanic() {
       setFlags((f) => ({ ...f, [idx]: true }));
       persist(idx, answers[idx] ?? "", true);
     } else {
-      setDone((d) => ({ ...d, [idx]: true }));
+      // Nothing to record for Done itself. The bar reads the answer, so a
+      // question turns green by having words in it rather than by being
+      // declared finished.
       if (flags[idx]) {
         setFlags((f) => {
           const next = { ...f };
@@ -940,43 +941,57 @@ section{margin-bottom:2rem;page-break-inside:avoid}
             barRef.current?.querySelectorAll("button")[next]?.focus();
           }}
         >
-          {queue.map((qi, n) => (
-            <button
-              key={n}
-              type="button"
-              /* One tab stop for the whole bar, then the arrow keys, instead
-                 of tabbing through thirty-nine of them to reach the answer. */
-              tabIndex={n === pos ? 0 : -1}
-              aria-current={n === pos ? "step" : undefined}
-              aria-label={
-                `Question ${n + 1} of ${queue.length}` +
-                (n === pos
-                  ? ", the one you are on"
-                  : flags[qi]
-                    ? ", parked"
-                    : done[qi]
-                      ? ", done"
-                      : "")
-              }
-              onClick={() => goTo(n)}
-              className="group cursor-pointer px-0.5 py-2.5 focus:outline-none"
-            >
-              <span
+          {queue.map((qi, n) => {
+            const p = pillState({
+              isCurrent: n === pos,
+              isParked: !!flags[qi],
+              hasWords: countWords(answers[qi] ?? "") > 0,
+              isMarked: !!marks[qi],
+            });
+            return (
+              <button
+                key={n}
+                type="button"
+                /* One tab stop for the whole bar, then the arrow keys, instead
+                   of tabbing through thirty-nine of them to reach the answer. */
+                tabIndex={n === pos ? 0 : -1}
+                aria-current={n === pos ? "step" : undefined}
+                aria-label={pillLabel(n + 1, queue.length, p)}
+                onClick={() => goTo(n)}
                 className={
-                  "block w-3.5 rounded-sm group-hover:h-1.5 " +
-                  "group-focus-visible:h-1.5 group-focus-visible:bg-calm-plum " +
-                  (n === pos ? "h-1.5 " : "h-[3px] ") +
-                  (n === pos
-                    ? "bg-calm-ink"
-                    : flags[qi]
-                      ? "bg-calm-plum"
-                      : done[qi]
-                        ? "bg-calm-moss"
-                        : "bg-calm-line")
+                  "group cursor-pointer rounded-sm px-0.5 py-2.5 focus:outline-none " +
+                  "focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-calm-ink"
                 }
-              />
-            </button>
-          ))}
+              >
+                {/* The bar sits on a fixed baseline inside a box its own tallest
+                    state, so growing it on hover, focus or for the current
+                    question never shifts the marked underline below. */}
+                <span className="flex h-1.5 w-3.5 items-end">
+                  <span
+                    className={
+                      "block w-full rounded-sm group-hover:h-1.5 group-focus-visible:h-1.5 " +
+                      (p.tone === "current" ? "h-1.5 " : "h-[3px] ") +
+                      (p.tone === "current"
+                        ? "bg-calm-ink"
+                        : p.tone === "parked"
+                          ? "bg-calm-plum"
+                          : p.tone === "written"
+                            ? "bg-calm-moss"
+                            : "bg-calm-line")
+                    }
+                  />
+                </span>
+                {/* Always rendered, so a marked and an unmarked pill are the
+                    same height and the row never jumps as marks come in. */}
+                <span
+                  className={
+                    "mt-[3px] block h-px w-3.5 " +
+                    (p.marked ? "bg-calm-soft" : "bg-transparent")
+                  }
+                />
+              </button>
+            );
+          })}
         </nav>
 
         <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
