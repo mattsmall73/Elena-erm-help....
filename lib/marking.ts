@@ -243,3 +243,55 @@ export function costEstimate(answers: number): string {
   const pence = answers * PENCE_PER_MARK;
   return pence < 100 ? `about ${pence}p` : `about £${(pence / 100).toFixed(2)}`;
 }
+
+/**
+ * What one segment of the progress bar should show.
+ *
+ * Green means there are words in the answer, read from the answer itself. It
+ * used to mean the Done button had been pressed, which is a different fact and
+ * a misleading one: Done on a blank question turned it green, and a full answer
+ * left by navigating away stayed grey.
+ *
+ * Parked beats written, because parking is something she chose and asking to
+ * come back to a question outranks the fact that there is already text in it.
+ * The cost is that a parked question does not also show as written; the parked
+ * set is small and "The ones I parked" collects them anyway.
+ *
+ * Marked rides alongside the tone rather than replacing it, so one glance
+ * separates what is left to write from what is left to mark.
+ */
+export type PillTone = "current" | "parked" | "written" | "blank";
+
+export interface PillState {
+  tone: PillTone;
+  marked: boolean;
+}
+
+export function pillState(q: {
+  isCurrent: boolean;
+  isParked: boolean;
+  hasWords: boolean;
+  isMarked: boolean;
+}): PillState {
+  const tone: PillTone = q.isCurrent
+    ? "current"
+    : q.isParked
+      ? "parked"
+      : q.hasWords
+        ? "written"
+        : "blank";
+  return { tone, marked: q.isMarked };
+}
+
+/** What a screen reader says for one segment. */
+export function pillLabel(n: number, total: number, s: PillState): string {
+  const said =
+    s.tone === "current"
+      ? ", the one you are on"
+      : s.tone === "parked"
+        ? ", parked"
+        : s.tone === "written"
+          ? ", written"
+          : ", nothing written yet";
+  return `Question ${n} of ${total}${said}${s.marked ? ", marked" : ""}`;
+}
