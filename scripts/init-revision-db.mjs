@@ -34,8 +34,28 @@ try {
     );
   `;
 
+  /* Marks. previous_* so a re-mark can show movement, max_level because the
+     running grade is a proportion of the scheme's ceiling and that differs by
+     question. Cascades with the sheet like the answers do. */
+  await client.sql`
+    CREATE TABLE IF NOT EXISTS revision_mark (
+      sheet_id text NOT NULL REFERENCES revision_sheet (id) ON DELETE CASCADE,
+      user_id text NOT NULL,
+      question_index int NOT NULL,
+      mark int,
+      max_mark int,
+      level int,
+      max_level int,
+      previous_mark int,
+      previous_level int,
+      feedback jsonb NOT NULL,
+      marked_at timestamptz NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (sheet_id, user_id, question_index)
+    );
+  `;
+
   await client.sql`COMMIT`;
-  console.log("Tables ready: revision_sheet, revision_answer");
+  console.log("Tables ready: revision_sheet, revision_answer, revision_mark");
   console.log("No terminal? Paste scripts/schema.sql into the Neon SQL editor instead.");
 } catch (err) {
   try { await client.sql`ROLLBACK`; } catch {}

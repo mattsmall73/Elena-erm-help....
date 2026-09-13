@@ -17,12 +17,21 @@ export const SHEET_LIMITS = {
   shapeStepChars: 500,
   hints: 20,
   hintChars: 1000,
+  idChars: 64,
 } as const;
 
 const QUESTION_TYPES: readonly QuestionType[] = ["short", "long", "judge"];
 
 export type ValidatedSheet =
-  | { ok: true; title: string; subject: string; questions: Question[] }
+  | {
+      ok: true;
+      /** Present only on the shipped sheet, which posts a fixed id so a
+          second press updates it rather than duplicating it. */
+      id?: string;
+      title: string;
+      subject: string;
+      questions: Question[];
+    }
   | { ok: false; reason: string };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -91,6 +100,17 @@ function question(v: unknown): Question | null | "drop" {
 export function validateSheet(input: unknown): ValidatedSheet {
   if (!isObject(input)) return { ok: false, reason: "Expected an object." };
 
+  // An id is optional. Hand-built sheets never send one and are always
+  // created; the shipped sheet sends a fixed one so it can be updated.
+  let id: string | undefined;
+  if (input.id !== undefined && input.id !== null) {
+    const raw = str(input.id, SHEET_LIMITS.idChars);
+    if (raw === null || !/^[a-z0-9][a-z0-9-]*$/.test(raw)) {
+      return { ok: false, reason: "That sheet id is not usable." };
+    }
+    id = raw;
+  }
+
   const title = str(input.title, SHEET_LIMITS.titleChars);
   if (title === null || title.trim().length === 0) {
     return { ok: false, reason: "A sheet needs a name." };
@@ -123,5 +143,5 @@ export function validateSheet(input: unknown): ValidatedSheet {
     return { ok: false, reason: "None of those questions had any text." };
   }
 
-  return { ok: true, title: title.trim(), subject: subject.trim(), questions };
+  return { ok: true, id, title: title.trim(), subject: subject.trim(), questions };
 }

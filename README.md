@@ -143,24 +143,55 @@ export const GET = withSession(async (req, ctx, session) => { /* ... */ });
 ### Ummm Less Panic
 
 - `app/ummm-less-panic/page.tsx` — the whole app.
-- `app/api/sheets/` — list and create, open and delete, save an answer, and
-  `generate` which turns pasted questions into cards.
+- `app/api/sheets/` — list and create, open and delete, save an answer,
+  `generate` which turns pasted questions into cards, and `mark` which marks
+  one answer and coaches the one change that would raise it.
+- `lib/marking.ts` — the running grade and the mark line. Pure arithmetic: the
+  grade is calculated here and never by the model.
+
+A sheet can be deleted from the list, behind a confirm that names what goes.
+Both child tables cascade, so its answers and marks go with it and there is no
+undo. Nothing else in either app destroys anything.
+
+When marking, her other answers on the same sheet are sent as reference only,
+fenced, capped at the ten most recent and truncated. The marker is told to read
+anything inside that fence as her writing rather than as instructions, never to
+mark or quote it, and to use it only to notice something she already knows that
+belongs in the answer being marked. Pointing out that she used something two
+questions ago is the most encouraging correction available, because it means
+she knew it.
 - `lib/revision-db.ts` — its database access, separate from `lib/db.ts` so
   fixing one app cannot break the other. Same client, same `POSTGRES_URL`.
 
-Two tables of its own, `revision_sheet` and `revision_answer`. Nothing
-Forgetful Doodle uses is touched.
+Three tables of its own, `revision_sheet`, `revision_answer` and
+`revision_mark`. Nothing Forgetful Doodle uses is touched.
 
 **Setting it up needs no terminal.** Two steps:
 
 1. Paste `scripts/schema.sql` into the Neon console SQL editor and run it. It
-   creates both tables and prints them back so you can see it worked. Safe to
-   run again; every statement is guarded.
+   creates all three tables and prints them back so you can see it worked.
+   Safe to run again; every statement is guarded.
+
+   **Run it again after any update that adds a table.** `revision_mark`
+   arrived after the first two, and a database without it cannot store marks.
+   Opening a sheet still works in that state and the server log says what to
+   run, so a missed migration degrades rather than breaking, but marking stays
+   off until the table exists.
 2. Open `/ummm-less-panic` and press **Load the history sheet**. The 39
-   questions ship as a static file and go in through the same create route a
+   questions ship as a static file and go in through the same route a
    hand-built sheet uses, so they are validated on the way like anything else.
-   The button only appears while there are no sheets, so it cannot be pressed
-   twice by accident.
+
+Once it is loaded, the same control reads **bring the history sheet up to
+date** and stays available. Pressing it again updates that sheet in place:
+the hints are refreshed and her answers are untouched, because nothing is
+deleted and `created_at` is left alone. That is the operation to use every
+time a sheet is improved, and it is why there is no delete control.
+
+Matching runs on the sheet's id first, then on its title. The title step is
+there because a sheet loaded before ids were fixed carries a generated id with
+a random suffix that nothing can predict. It only acts on an unambiguous single
+match, and only for the shipped sheet, since a sheet built by hand never sends
+an id and is always created fresh.
 
 `revision_answer.sheet_id` references the sheet and cascades on delete, so
 answers cannot outlive the sheet they belong to and a sheet id that does not
