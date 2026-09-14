@@ -68,7 +68,10 @@ const SHEET_SCHEMA = {
           shape: {
             type: "array",
             items: { type: "string" },
-            description: "2 to 5 steps describing how to structure the answer.",
+            description:
+              "2 to 5 steps describing how to structure the answer, each saying " +
+              "what she does rather than naming the exam move. \"End by saying " +
+              "how far you agree\" rather than \"close with a judgement\".",
           },
           hints: {
             type: "array",
@@ -91,7 +94,21 @@ For each question:
 - type: one of "short", "long", "judge". Use "short" for recall or single-feature answers, "long" for extended explanation, "judge" for anything asking how far the student agrees or which factor mattered most.
 - prompt: the question itself, cleaned up. Keep the student's wording. Fix obvious typos in names.
 - given: any "you may use" or "in your answer" material, as one sentence. Empty string if there is none.
-- shape: 2 to 5 steps describing how to structure the answer, written as instructions to the student.
+- shape: 2 to 5 steps describing how to structure the answer, written as instructions to the student. Say what she does, never what the move is called. Exam vocabulary names a thinking move without saying what to actually do with it, so replace every name with the action.
+
+  close with a judgement  ->  end by saying how far you agree
+  reach a conclusion      ->  end by saying which one mattered most and why
+  weigh them              ->  say which one was worse
+  make a judgement        ->  say which one you think it was
+  evaluate                ->  say how well it worked
+  analyse                 ->  say why it happened
+  substantiate            ->  prove it with a real example
+  consider the extent     ->  say how much of it was true
+  by what measure         ->  choose how you are comparing them
+  develop the point       ->  add a sentence saying why it mattered
+  link back               ->  end the paragraph by answering the question
+
+  The test: could she act on the step without knowing any exam terminology? If not, rewrite it. A step is allowed to name a mark or a level, since those are facts she needs, and it may say a paragraph is where the top marks are. It may not tell her to do a thing the exam has a word for and leave the word standing in for the thing.
 - hints: fragments, never sentences. Each carries a fact and cannot be pasted into an answer as it stands, because building the sentence is the work.
 
   Wrong: "Imposed by Pope Innocent III in March 1208 after John refused to accept Stephen Langton as Archbishop of Canterbury."

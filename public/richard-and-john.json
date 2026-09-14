@@ -218,7 +218,7 @@
       "prompt": "Explain why there were anti-Jewish pogroms in 1189–90.",
       "given": "You may use: the Crusades, events at Richard's coronation. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -236,7 +236,7 @@
       "prompt": "Explain why religion was so important to people living between 1189 and 1216.",
       "given": "You may use: purgatory, the role of the priest. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -254,7 +254,7 @@
       "prompt": "Explain the main duties of a medieval monarch.",
       "given": "You may use: knight, manager. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -272,7 +272,7 @@
       "prompt": "Explain why Richard and John had to raise taxes.",
       "given": "You may use: the Third Crusade, lands in France. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -290,7 +290,7 @@
       "prompt": "Explain why Richard I joined the Third Crusade.",
       "given": "You may use: religious devotion, personal glory.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -308,7 +308,7 @@
       "prompt": "Explain why Richard and his fellow crusaders failed to recapture Jerusalem.",
       "given": "You may use: Richard's quarrel with Phillip, Saladin's strengths as a leader. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -326,7 +326,7 @@
       "prompt": "Explain why people from England joined the Third Crusade.",
       "given": "You may use: religion, rewards. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -344,7 +344,7 @@
       "prompt": "Explain why Normandy was so important to Richard, John and Phillip.",
       "given": "You may use: barons, alliances. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -362,7 +362,7 @@
       "prompt": "Explain why Richard was able to win back Normandy between 1194 and 1199.",
       "given": "You may use: alliance, Chateau Gaillard. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -380,7 +380,7 @@
       "prompt": "Explain why John's relationship with his barons worsened between 1205 and 1215.",
       "given": "You may use: loss of Normandy, finances. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -398,7 +398,7 @@
       "prompt": "Explain why there was a dispute between John and the Pope.",
       "given": "You may use: the interdict, seizure of Church property. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -416,7 +416,7 @@
       "prompt": "Explain why Richard I was able to secure his power when he became king.",
       "given": "You may use: Richard's brother John, Richard's coronation. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -434,7 +434,7 @@
       "prompt": "Explain why Richard I failed to recapture Jerusalem.",
       "given": "You may use: supplies of food, Saladin. You must also use information of your own.",
       "shape": [
-        "Paragraph on the first prompt. Point, evidence, then link back to the question.",
+        "Paragraph on the first prompt. Point, evidence, then end by answering the question.",
         "Paragraph on the second prompt. Same shape.",
         "Paragraph on something of your own. This is where the top marks live."
       ],
@@ -455,7 +455,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -476,7 +476,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -497,7 +497,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -519,7 +519,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -540,7 +540,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -562,7 +562,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -583,7 +583,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -604,7 +604,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -626,7 +626,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -648,7 +648,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -669,7 +669,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -691,7 +691,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
@@ -712,7 +712,7 @@
         "Paragraph arguing yes, the statement is right. Use the first prompt.",
         "Paragraph arguing something else mattered more. Use the second prompt.",
         "Paragraph on a factor of your own.",
-        "Conclusion that says which one mattered most and why. The judgement is what lifts the mark.",
+        "End by saying how far you agree, and why. That last paragraph is where the top marks are.",
         "Spelling, punctuation and grammar are marked on this question too."
       ],
       "hints": [
