@@ -210,10 +210,40 @@ export const POST = withSession(async (request) => {
             schema: SHEET_SCHEMA as unknown as Record<string, unknown>,
           },
         },
-        system: SYSTEM,
+        /* One explicit breakpoint at the end of the system prompt, rather
+           than top-level automatic caching.
+
+           Automatic places its breakpoint on the last cacheable block, and
+           both these requests end in content unique to the call. That would
+           cache bytes that are never read back and charge the write premium
+           on every one of them, which is worse than not caching at all. The
+           marker here ends the shared prefix, so the varying tail sits
+           outside it.
+
+           The default five minute TTL is right: the calls that share this
+           prefix come seconds apart, and every read refreshes the timer.
+
+           Editing the prompt above invalidates the entry, so the first call
+           after a deploy pays the write again. Two calls to break even. */
+        system: [
+          { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
+        ],
         messages: [{ role: "user", content: userText }],
       })
       .finalMessage();
+
+    /* Whether the breakpoint above is actually working is not visible from the
+       outside, and a prefix that silently fails to cache reports no error: it
+       just bills full price forever. These three numbers say which is
+       happening. A read of zero on every call after the first means something
+       in the prefix is changing between requests. */
+    const u = message.usage;
+    console.log(
+      "[sheets/generate] tokens in:",
+      `fresh ${u.input_tokens}`,
+      `cache written ${u.cache_creation_input_tokens ?? 0}`,
+      `cache read ${u.cache_read_input_tokens ?? 0}`,
+    );
 
     if (message.stop_reason === "refusal") {
       console.error(
