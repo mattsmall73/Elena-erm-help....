@@ -50,7 +50,10 @@ const SHEET_SCHEMA = {
           label: {
             type: "string",
             description:
-              'Question type and mark tariff, e.g. "Explain why (12 marks)". Omit the tariff if genuinely unclear.',
+              'Question type and mark tariff, e.g. "Explain why (12 marks)". ' +
+              "Where spelling and grammar carry their own marks, say both: " +
+              '"Respond to this question (30 marks, plus 4 for spelling and grammar)". ' +
+              "Omit the tariff only if genuinely unclear.",
           },
           type: {
             type: "string",
@@ -63,7 +66,11 @@ const SHEET_SCHEMA = {
           given: {
             type: "string",
             description:
-              'Any "you may use" material as one sentence. Empty string if there is none.',
+              "Anything the paper attaches to the question about what to use or " +
+              'what to cover: "you may use" material, "in your answer you must" ' +
+              'instructions, and coverage rubrics such as "Write about the extract ' +
+              'and the play as a whole". The paper\'s own words, one sentence. ' +
+              "Empty string only if the question carries nothing.",
           },
           shape: {
             type: "array",
@@ -91,9 +98,24 @@ const SYSTEM = `You turn a student's exam questions into revision cards.
 
 For each question:
 - label: question type and mark tariff, e.g. "Describe one feature (4 marks)", "Explain why (12 marks)", "How far do you agree (16 marks)". Work the tariff out from the wording. If it is genuinely unclear, leave the tariff off.
+
+  A question can carry more than one total. Where marks for spelling, punctuation and grammar are given on their own, as AO4 is on an English Literature paper, say both and never fold them into one number or drop the smaller one.
+
+    Wrong: "Respond to this question (30 marks)"
+    Right: "Respond to this question (30 marks, plus 4 for spelling and grammar)"
+
+  Those separate marks are the ones most often left on the table, and she cannot go after them if the label does not say they exist.
 - type: one of "short", "long", "judge". Use "short" for recall or single-feature answers, "long" for extended explanation, "judge" for anything asking how far the student agrees or which factor mattered most.
 - prompt: the question itself, cleaned up. Keep the student's wording. Fix obvious typos in names.
-- given: any "you may use" or "in your answer" material, as one sentence. Empty string if there is none.
+- given: anything the paper attaches to the question telling her what to use or what to cover. Three kinds, all of which belong here:
+
+    "You may use the following" source or quotation material.
+    "In your answer you must" instructions.
+    Coverage rubrics, such as "Write about the extract and the play as a whole".
+
+  Keep the paper's own words for a coverage rubric rather than paraphrasing it. One sentence. Empty string only if the question genuinely carries nothing.
+
+  The coverage rubric is the most valuable thing this field holds. On an extract question, writing only about the extract caps the mark however good the writing is, and no amount of quality in the answer wins those marks back. A rubric left out of this field is the one omission here that costs marks on its own.
 - shape: 2 to 5 steps describing how to structure the answer, written as instructions to the student. Say what she does, never what the move is called. Exam vocabulary names a thinking move without saying what to actually do with it, so replace every name with the action.
 
   close with a judgement  ->  end by saying how far you agree
@@ -107,6 +129,8 @@ For each question:
   by what measure         ->  choose how you are comparing them
   develop the point       ->  add a sentence saying why it mattered
   link back               ->  end the paragraph by answering the question
+
+  Where the question says to write about both an extract and the whole work, one step has to send her past the extract. "Paragraph on where this comes back later in the play" is a step. "Cover the play as a whole" names the move and breaks the rule above.
 
   The test: could she act on the step without knowing any exam terminology? If not, rewrite it. A step is allowed to name a mark or a level, since those are facts she needs, and it may say a paragraph is where the top marks are. It may not tell her to do a thing the exam has a word for and leave the word standing in for the thing.
 - hints: fragments, never sentences. Each carries a fact and cannot be pasted into an answer as it stands, because building the sentence is the work.
