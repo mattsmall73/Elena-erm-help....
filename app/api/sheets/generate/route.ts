@@ -76,9 +76,12 @@ const SHEET_SCHEMA = {
             type: "array",
             items: { type: "string" },
             description:
-              "2 to 5 steps describing how to structure the answer, each saying " +
+              "2 to 6 steps describing how to structure the answer, each saying " +
               "what she does rather than naming the exam move. \"End by saying " +
-              "how far you agree\" rather than \"close with a judgement\".",
+              "how far you agree\" rather than \"close with a judgement\". Every " +
+              "separately marked strand needs a step: on English Literature that " +
+              "includes one bringing in what the work's first audience believed, " +
+              "named for this text rather than called context.",
           },
           hints: {
             type: "array",
@@ -116,7 +119,18 @@ For each question:
   Keep the paper's own words for a coverage rubric rather than paraphrasing it. One sentence. Empty string only if the question genuinely carries nothing.
 
   The coverage rubric is the most valuable thing this field holds. On an extract question, writing only about the extract caps the mark however good the writing is, and no amount of quality in the answer wins those marks back. A rubric left out of this field is the one omission here that costs marks on its own.
-- shape: 2 to 5 steps describing how to structure the answer, written as instructions to the student. Say what she does, never what the move is called. Exam vocabulary names a thinking move without saying what to actually do with it, so replace every name with the action.
+- shape: 2 to 6 steps describing how to structure the answer, written as instructions to the student.
+
+  Work out what the question is marked on, and give every separately marked strand a step. A strand with no step costs every mark in it however good the rest of the answer is, and that is the most expensive kind of omission this field can make.
+
+  On an English Literature question the strands are what the text says, how it is written, and what was going on when it was written or what its first audience believed. That last one is a whole strand on its own and needs its own step. Name the belief or the moment for this text rather than calling it context:
+
+    Wrong: "Include context."
+    Wrong: "Cover the historical background of the play."
+    Right: "Bring in what a Jacobean audience believed about kingship, regicide and the supernatural."
+    Right: "Bring in what Victorian readers feared about respectability and a double life."
+
+  Where the label says spelling and grammar carry their own marks, one step says so too, as the last step. Say what she does, never what the move is called. Exam vocabulary names a thinking move without saying what to actually do with it, so replace every name with the action.
 
   close with a judgement  ->  end by saying how far you agree
   reach a conclusion      ->  end by saying which one mattered most and why
