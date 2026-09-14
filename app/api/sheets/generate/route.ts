@@ -50,7 +50,10 @@ const SHEET_SCHEMA = {
           label: {
             type: "string",
             description:
-              'Question type and mark tariff, e.g. "Explain why (12 marks)". Omit the tariff if genuinely unclear.',
+              'Question type and mark tariff, e.g. "Explain why (12 marks)". ' +
+              "Where spelling and grammar carry their own marks, say both: " +
+              '"Respond to this question (30 marks, plus 4 for spelling and grammar)". ' +
+              "Omit the tariff only if genuinely unclear.",
           },
           type: {
             type: "string",
@@ -63,12 +66,22 @@ const SHEET_SCHEMA = {
           given: {
             type: "string",
             description:
-              'Any "you may use" material as one sentence. Empty string if there is none.',
+              "Anything the paper attaches to the question about what to use or " +
+              'what to cover: "you may use" material, "in your answer you must" ' +
+              'instructions, and coverage rubrics such as "Write about the extract ' +
+              'and the play as a whole". The paper\'s own words, one sentence. ' +
+              "Empty string only if the question carries nothing.",
           },
           shape: {
             type: "array",
             items: { type: "string" },
-            description: "2 to 5 steps describing how to structure the answer.",
+            description:
+              "2 to 6 steps describing how to structure the answer, each saying " +
+              "what she does rather than naming the exam move. \"End by saying " +
+              "how far you agree\" rather than \"close with a judgement\". Every " +
+              "separately marked strand needs a step: on English Literature that " +
+              "includes one bringing in what the work's first audience believed, " +
+              "named for this text rather than called context.",
           },
           hints: {
             type: "array",
@@ -88,10 +101,52 @@ const SYSTEM = `You turn a student's exam questions into revision cards.
 
 For each question:
 - label: question type and mark tariff, e.g. "Describe one feature (4 marks)", "Explain why (12 marks)", "How far do you agree (16 marks)". Work the tariff out from the wording. If it is genuinely unclear, leave the tariff off.
+
+  A question can carry more than one total. Where marks for spelling, punctuation and grammar are given on their own, as AO4 is on an English Literature paper, say both and never fold them into one number or drop the smaller one.
+
+    Wrong: "Respond to this question (30 marks)"
+    Right: "Respond to this question (30 marks, plus 4 for spelling and grammar)"
+
+  Those separate marks are the ones most often left on the table, and she cannot go after them if the label does not say they exist.
 - type: one of "short", "long", "judge". Use "short" for recall or single-feature answers, "long" for extended explanation, "judge" for anything asking how far the student agrees or which factor mattered most.
 - prompt: the question itself, cleaned up. Keep the student's wording. Fix obvious typos in names.
-- given: any "you may use" or "in your answer" material, as one sentence. Empty string if there is none.
-- shape: 2 to 5 steps describing how to structure the answer, written as instructions to the student.
+- given: anything the paper attaches to the question telling her what to use or what to cover. Three kinds, all of which belong here:
+
+    "You may use the following" source or quotation material.
+    "In your answer you must" instructions.
+    Coverage rubrics, such as "Write about the extract and the play as a whole".
+
+  Keep the paper's own words for a coverage rubric rather than paraphrasing it. One sentence. Empty string only if the question genuinely carries nothing.
+
+  The coverage rubric is the most valuable thing this field holds. On an extract question, writing only about the extract caps the mark however good the writing is, and no amount of quality in the answer wins those marks back. A rubric left out of this field is the one omission here that costs marks on its own.
+- shape: 2 to 6 steps describing how to structure the answer, written as instructions to the student.
+
+  Work out what the question is marked on, and give every separately marked strand a step. A strand with no step costs every mark in it however good the rest of the answer is, and that is the most expensive kind of omission this field can make.
+
+  On an English Literature question the strands are what the text says, how it is written, and what was going on when it was written or what its first audience believed. That last one is a whole strand on its own and needs its own step. Name the belief or the moment for this text rather than calling it context:
+
+    Wrong: "Include context."
+    Wrong: "Cover the historical background of the play."
+    Right: "Bring in what a Jacobean audience believed about kingship, regicide and the supernatural."
+    Right: "Bring in what Victorian readers feared about respectability and a double life."
+
+  Where the label says spelling and grammar carry their own marks, one step says so too, as the last step. Say what she does, never what the move is called. Exam vocabulary names a thinking move without saying what to actually do with it, so replace every name with the action.
+
+  close with a judgement  ->  end by saying how far you agree
+  reach a conclusion      ->  end by saying which one mattered most and why
+  weigh them              ->  say which one was worse
+  make a judgement        ->  say which one you think it was
+  evaluate                ->  say how well it worked
+  analyse                 ->  say why it happened
+  substantiate            ->  prove it with a real example
+  consider the extent     ->  say how much of it was true
+  by what measure         ->  choose how you are comparing them
+  develop the point       ->  add a sentence saying why it mattered
+  link back               ->  end the paragraph by answering the question
+
+  Where the question says to write about both an extract and the whole work, one step has to send her past the extract. "Paragraph on where this comes back later in the play" is a step. "Cover the play as a whole" names the move and breaks the rule above.
+
+  The test: could she act on the step without knowing any exam terminology? If not, rewrite it. A step is allowed to name a mark or a level, since those are facts she needs, and it may say a paragraph is where the top marks are. It may not tell her to do a thing the exam has a word for and leave the word standing in for the thing.
 - hints: fragments, never sentences. Each carries a fact and cannot be pasted into an answer as it stands, because building the sentence is the work.
 
   Wrong: "Imposed by Pope Innocent III in March 1208 after John refused to accept Stephen Langton as Archbishop of Canterbury."
@@ -169,10 +224,40 @@ export const POST = withSession(async (request) => {
             schema: SHEET_SCHEMA as unknown as Record<string, unknown>,
           },
         },
-        system: SYSTEM,
+        /* One explicit breakpoint at the end of the system prompt, rather
+           than top-level automatic caching.
+
+           Automatic places its breakpoint on the last cacheable block, and
+           both these requests end in content unique to the call. That would
+           cache bytes that are never read back and charge the write premium
+           on every one of them, which is worse than not caching at all. The
+           marker here ends the shared prefix, so the varying tail sits
+           outside it.
+
+           The default five minute TTL is right: the calls that share this
+           prefix come seconds apart, and every read refreshes the timer.
+
+           Editing the prompt above invalidates the entry, so the first call
+           after a deploy pays the write again. Two calls to break even. */
+        system: [
+          { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
+        ],
         messages: [{ role: "user", content: userText }],
       })
       .finalMessage();
+
+    /* Whether the breakpoint above is actually working is not visible from the
+       outside, and a prefix that silently fails to cache reports no error: it
+       just bills full price forever. These three numbers say which is
+       happening. A read of zero on every call after the first means something
+       in the prefix is changing between requests. */
+    const u = message.usage;
+    console.log(
+      "[sheets/generate] tokens in:",
+      `fresh ${u.input_tokens}`,
+      `cache written ${u.cache_creation_input_tokens ?? 0}`,
+      `cache read ${u.cache_read_input_tokens ?? 0}`,
+    );
 
     if (message.stop_reason === "refusal") {
       console.error(
