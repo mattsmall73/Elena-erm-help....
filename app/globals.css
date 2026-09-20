@@ -225,3 +225,174 @@ html.comfort body {
 @media (prefers-reduced-motion: reduce) {
   .wave-letter { animation: none; }
 }
+
+/* ---- Piggy Bank ----------------------------------------------------------
+   Ported from the prototype. Namespaced piggy- so nothing here can reach the
+   other two apps, except .sparkle-fill, which the brief names directly.
+   Everything is stilled at the bottom under prefers-reduced-motion, apart from
+   the sparkly bars, which keep their colour and glitter and only stop moving,
+   because the colour is what carries the information. */
+
+.piggy-stage { perspective: 1100px; }
+.piggy-wrap { transform-style: preserve-3d; will-change: transform; }
+
+.piggy-wrap.is-spin { animation: piggy-spin 2s cubic-bezier(0.32, 0.05, 0.2, 1); }
+@keyframes piggy-spin {
+  0%   { transform: rotateY(0) scale(1); }
+  12%  { transform: rotateY(-40deg) scale(0.88); }
+  85%  { transform: rotateY(1080deg) scale(1.14); }
+  100% { transform: rotateY(1080deg) scale(1); }
+}
+.piggy-wrap.is-squish { animation: piggy-squish 0.34s ease-out; }
+@keyframes piggy-squish {
+  0%   { transform: scale(1, 1); }
+  35%  { transform: scale(1.07, 0.91) translateY(4px); }
+  70%  { transform: scale(0.98, 1.03); }
+  100% { transform: scale(1, 1); }
+}
+.piggy-wrap.is-wiggle { animation: piggy-wiggle 1.1s ease-in-out; }
+@keyframes piggy-wiggle {
+  0%, 100% { transform: rotate(0); }
+  25%      { transform: rotate(-3deg); }
+  60%      { transform: rotate(3deg); }
+}
+
+.piggy-glow-body { filter: drop-shadow(0 0 15px rgba(255, 60, 166, 0.45)); }
+.piggy-body.is-shine { animation: piggy-shine 1.25s ease-out; }
+@keyframes piggy-shine {
+  0%   { filter: drop-shadow(0 0 15px rgba(255, 60, 166, 0.45)); }
+  22%  { filter: drop-shadow(0 0 36px rgba(255, 192, 77, 0.95)) brightness(1.28); }
+  55%  { filter: drop-shadow(0 0 24px rgba(46, 230, 200, 0.7)) brightness(1.1); }
+  100% { filter: drop-shadow(0 0 15px rgba(255, 60, 166, 0.45)); }
+}
+
+.piggy-coin {
+  position: absolute;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #ffe9b8, var(--color-amber) 60%, #c2871a);
+  border: 2px solid #ffeec2;
+  box-shadow: 0 0 15px rgba(255, 192, 77, 0.85);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 600; font-size: 0.6rem; color: #5a3c05;
+  pointer-events: none;
+  animation: piggy-drop 0.8s cubic-bezier(0.42, 0.02, 0.7, 1) forwards;
+}
+@keyframes piggy-drop {
+  0%   { transform: translateY(-200px) rotate(0) scale(0.65); opacity: 0; }
+  12%  { opacity: 1; }
+  70%  { transform: translateY(-16px) rotate(400deg) scale(1); }
+  100% { transform: translateY(10px) rotate(520deg) scale(0.3); opacity: 0; }
+}
+
+.piggy-spark {
+  position: absolute; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--color-cyan); box-shadow: 0 0 10px var(--color-cyan);
+  pointer-events: none;
+  animation: piggy-spark 0.72s ease-out forwards;
+}
+@keyframes piggy-spark {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+}
+
+.piggy-twinkle {
+  position: absolute; width: 18px; height: 18px; pointer-events: none;
+  clip-path: polygon(50% 0%, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0% 50%, 40% 40%);
+  animation: piggy-twinkle 1.05s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+@keyframes piggy-twinkle {
+  0%   { transform: scale(0) rotate(0); opacity: 0; }
+  28%  { transform: scale(1.2) rotate(75deg); opacity: 1; }
+  100% { transform: scale(0) rotate(170deg); opacity: 0; }
+}
+
+.piggy-ring {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  border: 2px solid var(--color-amber);
+  animation: piggy-ring 0.85s ease-out forwards;
+}
+@keyframes piggy-ring {
+  0%   { width: 60px; height: 60px; opacity: 0.85; transform: translate(-30px, -30px); }
+  100% { width: 250px; height: 250px; opacity: 0; transform: translate(-125px, -125px); }
+}
+
+/* Past an hour in a day, the full bar gets overlaid with this. */
+.sparkle-fill {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  border-radius: 9px 9px 0 0;
+  overflow: hidden;
+  background: linear-gradient(115deg, #e0991c 0%, #fff4d2 36%, #ffc04d 54%, #e0991c 100%);
+  background-size: 260% 100%;
+  animation: piggy-shimmer 2.8s linear infinite;
+  box-shadow: 0 0 12px rgba(255, 192, 77, 0.6);
+  transition: height 0.55s cubic-bezier(0.3, 1.25, 0.4, 1);
+}
+.sparkle-fill::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 25% 22%, #fff 0 1.3px, transparent 1.7px),
+    radial-gradient(circle at 72% 58%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 44% 88%, #fff 0 1.2px, transparent 1.6px);
+  background-size: 15px 15px, 21px 21px, 27px 27px;
+  animation: piggy-glitter 1.5s ease-in-out infinite alternate;
+}
+.sparkle-fill.tier3 {
+  background: linear-gradient(115deg, #bf1f78 0%, #ffdcf0 36%, #ff3ca6 54%, #bf1f78 100%);
+  background-size: 260% 100%;
+  box-shadow: 0 0 14px rgba(255, 60, 166, 0.7);
+  animation-duration: 2.1s;
+}
+@keyframes piggy-shimmer { to { background-position: 260% 50%; } }
+@keyframes piggy-glitter { from { opacity: 0.3; } to { opacity: 1; } }
+
+.piggy-fill {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(180deg, var(--color-cyan), #1a8d7c);
+  border-radius: 9px 9px 0 0;
+  transition: height 0.55s cubic-bezier(0.3, 1.25, 0.4, 1);
+}
+
+/* The shout. It overshoots and settles rather than easing in, which is the
+   part that makes it land. */
+.piggy-shout-inner { transform: scale(0.05); opacity: 0; }
+.piggy-shout.is-on .piggy-shout-inner {
+  animation: piggy-zoom 0.85s cubic-bezier(0.18, 1.45, 0.3, 1) forwards;
+}
+@keyframes piggy-zoom {
+  0%   { transform: scale(0.05) rotate(-14deg); opacity: 0; }
+  50%  { transform: scale(1.16) rotate(4deg); opacity: 1; }
+  72%  { transform: scale(0.95) rotate(-2deg); }
+  88%  { transform: scale(1.03) rotate(1deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+.piggy-confetti {
+  position: fixed; width: 9px; height: 14px; top: -22px;
+  z-index: 50; pointer-events: none;
+  animation: piggy-fall linear forwards;
+}
+@keyframes piggy-fall {
+  0%   { transform: translateY(0) rotate(0); opacity: 1; }
+  100% { transform: translateY(108vh) rotate(760deg); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piggy-wrap.is-spin,
+  .piggy-wrap.is-squish,
+  .piggy-wrap.is-wiggle,
+  .piggy-coin,
+  .piggy-spark,
+  .piggy-twinkle,
+  .piggy-ring,
+  .piggy-confetti,
+  .piggy-body.is-shine { animation-duration: 0.01s; }
+  .piggy-fill, .sparkle-fill { transition: none; }
+  .piggy-shout.is-on .piggy-shout-inner {
+    animation: none; transform: scale(1); opacity: 1;
+  }
+  /* The sparkly bars keep their colour and their glitter. Only the movement
+     stops, so a day past the hour still reads as one at a glance. */
+  .sparkle-fill, .sparkle-fill::after { animation: none; }
+  .sparkle-fill { background-position: 40% 50%; }
+  .sparkle-fill::after { opacity: 0.8; }
+}
