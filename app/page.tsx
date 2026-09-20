@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Elena's Apps",
-  description: "Two small apps that make school days easier.",
+  description: "Three small apps that make school days easier.",
 };
 
 const TITLE = "Elena's Apps";
@@ -55,6 +55,22 @@ export default function Home() {
             The original. Decks, flip cards and self marking, still where you left it.
           </p>
           <span className="text-magenta self-start rounded-full border border-current px-3 py-1 text-sm">
+            Open
+          </span>
+        </Link>
+
+        <Link
+          href="/piggy-bank"
+          className="card-glow bg-card border-amber/40 flex flex-col gap-3 rounded-2xl border p-7 no-underline transition-transform hover:-translate-y-1 focus-visible:-translate-y-1 sm:col-span-2"
+        >
+          <h2 className="font-display text-amber text-glow-amber m-0 text-3xl font-bold">
+            Piggy Bank
+          </h2>
+          <p className="text-muted m-0 flex-1 text-sm leading-relaxed">
+            £1 an hour for extra revision. Put the minutes in, watch the coins drop, and
+            find out what Dad owes you on Sunday.
+          </p>
+          <span className="text-amber self-start rounded-full border border-current px-3 py-1 text-sm">
             Open
           </span>
         </Link>
