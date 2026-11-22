@@ -206,6 +206,44 @@ is told to leave out anything it is unsure of rather than guess, and that mostly
 holds. Where a wrong date costs marks, check a surprise against your notes. The
 sheet is a prompt, not gospel.
 
+### English Language papers
+
+**Add an English Language paper**, on the sheet list, turns one AQA Paper 1
+from her school booklet into a sheet. She chooses the booklet PDF and types the
+pages for one paper from its contents page, or photographs the pages. The
+browser cuts the PDF down to just those pages with `pdf-lib`, so an 87-page,
+15 MB booklet becomes about 1 MB and stays under Vercel's request limit.
+
+**The source is kept as images of her own pages, never as text.** Most
+extracts are from copyrighted novels, and the API's content filter blocks a
+model writing out long published passages word for word ("Output blocked by
+content filtering policy"). So `/api/sheets/paper` only reads the pages and
+returns which pages hold the source, the last line number, the questions,
+their line ranges, the tick-box answers and short pointers. The browser then
+draws the source pages with `pdfjs-dist`, crops the margins, and saves them
+with the sheet in `revision_source`.
+
+**Run `scripts/schema.sql` in Neon again** to create `revision_source`.
+Without it, saving an English paper fails with a message saying so and leaves
+nothing half-saved; every other sheet is unaffected.
+
+`lib/english-paper.ts` turns a read paper into five cards:
+
+- **Q1** tick boxes, checked in the browser as she picks. A wrong pick names
+  the line the answer is on and leaves the finding to her.
+- **Q2 to Q4** with the source page beside the answer box, the question's line
+  range in the panel header, and three zoom sizes. On a phone the source folds
+  to one bar so the question comes first.
+- **Q5** writing, with the school's DROP, SHIFT, ZOOM, LEAVE planner as its
+  steps.
+
+Marking uses `lib/english-marking-prompt.ts`, chosen when the sheet's subject
+is English Language. It gets the source page images with each answer, cached
+across a "mark everything" run. It carries the History marker's eight rules
+and voice, plus: it checks every quote is in the source and inside the lines
+the question allows, gives spelling and punctuation feedback only on Q5, and
+shows Q5's 24 and 16 separately.
+
 ## Privacy
 
 Single user — no accounts, no leaderboards against other people (the opponent is

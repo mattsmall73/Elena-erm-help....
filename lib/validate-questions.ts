@@ -1,4 +1,4 @@
-import type { Question, QuestionType } from "./revision-db";
+import type { Question, QuestionType, Source, TickPart } from "./revision-db";
 
 /**
  * Bounds for an incoming sheet. Set well above anything real: the history
@@ -18,9 +18,42 @@ export const SHEET_LIMITS = {
   hints: 20,
   hintChars: 1000,
   idChars: 64,
+  /* An English Language source is about fifty printed lines. Generous, since
+     a long extract over two pages runs to ninety. */
+  sourceLines: 400,
+  /* Source page images, posted with the sheet. A page rendered at 1400px is
+     about 300 KB of base64. */
+  sourcePages: 4,
+  sourcePageChars: 1_500_000,
+  sourceTotalChars: 3_600_000,
+  tickParts: 8,
+  tickOptions: 6,
+  tickChars: 300,
 } as const;
 
-const QUESTION_TYPES: readonly QuestionType[] = ["short", "long", "judge"];
+const QUESTION_TYPES: readonly QuestionType[] = ["short", "long", "judge", "tick", "write"];
+
+const isInt = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v);
+
+/** A source marker: the last line number printed on the source. */
+function source(v: unknown): Source | null {
+  if (!isObject(v)) return null;
+  return isInt(v.lines) && v.lines >= 1 && v.lines <= SHEET_LIMITS.sourceLines
+    ? { lines: v.lines }
+    : null;
+}
+
+function tickPart(v: unknown): TickPart | null {
+  if (!isObject(v)) return null;
+  const prompt = str(v.prompt, SHEET_LIMITS.tickChars);
+  const options = strings(v.options, SHEET_LIMITS.tickOptions, SHEET_LIMITS.tickChars);
+  if (prompt === null || options === null || options.length < 2) return null;
+  const correct =
+    isInt(v.correct) && v.correct >= 0 && v.correct < options.length ? v.correct : -1;
+  const line = isInt(v.line) && v.line > 0 ? v.line : 0;
+  return { prompt, options, correct, line };
+}
 
 export type ValidatedSheet =
   | {
@@ -88,7 +121,37 @@ function question(v: unknown): Question | null | "drop" {
     ? (v.type as QuestionType)
     : "long";
 
-  return { label, type, prompt, given, shape, hints };
+  const out: Question = { label, type, prompt, given, shape, hints };
+
+  if (v.source !== undefined && v.source !== null) {
+    const s = source(v.source);
+    if (s === null) return null;
+    out.source = s;
+  }
+
+  if (v.focus !== undefined && v.focus !== null) {
+    const f = v.focus as Record<string, unknown>;
+    const max = out.source?.lines ?? 0;
+    // A focus only means something against a source, and only inside it.
+    if (!isObject(f) || !isInt(f.from) || !isInt(f.to) || max === 0) return null;
+    const from = Math.max(1, Math.min(f.from, max));
+    const to = Math.max(from, Math.min(f.to, max));
+    out.focus = { from, to };
+  }
+
+  if (type === "tick") {
+    if (!Array.isArray(v.parts) || v.parts.length === 0) return null;
+    if (v.parts.length > SHEET_LIMITS.tickParts) return null;
+    const parts: TickPart[] = [];
+    for (const p of v.parts) {
+      const t = tickPart(p);
+      if (t === null) return null;
+      parts.push(t);
+    }
+    out.parts = parts;
+  }
+
+  return out;
 }
 
 /**
@@ -144,4 +207,38 @@ export function validateSheet(input: unknown): ValidatedSheet {
   }
 
   return { ok: true, id, title: title.trim(), subject: subject.trim(), questions };
+}
+
+const PAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/**
+ * Source page images posted with an English Language sheet. Optional: every
+ * other sheet sends none. Bounded so a large body cannot reach the table.
+ */
+export function validateSourcePages(
+  v: unknown,
+): { ok: true; pages: { mediaType: string; data: string }[] } | { ok: false; reason: string } {
+  if (v === undefined || v === null) return { ok: true, pages: [] };
+  if (!Array.isArray(v) || v.length > SHEET_LIMITS.sourcePages) {
+    return { ok: false, reason: "Too many source pages for one paper." };
+  }
+  let total = 0;
+  const pages: { mediaType: string; data: string }[] = [];
+  for (const raw of v) {
+    if (!isObject(raw)) return { ok: false, reason: "A source page is malformed." };
+    const mediaType = typeof raw.mediaType === "string" ? raw.mediaType : "";
+    const data = typeof raw.data === "string" ? raw.data : "";
+    if (!PAGE_TYPES.includes(mediaType) || !data || !/^[A-Za-z0-9+/=]+$/.test(data)) {
+      return { ok: false, reason: "A source page is malformed." };
+    }
+    if (data.length > SHEET_LIMITS.sourcePageChars) {
+      return { ok: false, reason: "A source page is too big." };
+    }
+    total += data.length;
+    pages.push({ mediaType, data });
+  }
+  if (total > SHEET_LIMITS.sourceTotalChars) {
+    return { ok: false, reason: "The source pages are too big together." };
+  }
+  return { ok: true, pages };
 }

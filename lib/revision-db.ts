@@ -11,7 +11,30 @@ import type { StoredMark } from "./marking";
    in proxy.ts plus withSession on each route, so this is a partition
    key and nothing more. */
 
-export type QuestionType = "short" | "long" | "judge";
+export type QuestionType = "short" | "long" | "judge" | "tick" | "write";
+
+/**
+ * Marks a question as being about the sheet's reading source.
+ *
+ * The source itself is not text. English Language extracts are mostly from
+ * copyrighted novels, so the app keeps images of her own booklet pages, in
+ * revision_source, and shows and marks against those. All a question carries
+ * is the last line number printed on the source, so its line ranges can be
+ * checked and "to the end" has a number.
+ */
+export type Source = {
+  lines: number;
+};
+
+/** One part of a tick-box question: pick one of a few options. */
+export type TickPart = {
+  prompt: string;
+  options: string[];
+  /** Index into options, or -1 if the paper could not be checked. */
+  correct: number;
+  /** The source line the answer is on, or 0 if not known. */
+  line: number;
+};
 
 export type Question = {
   label: string;
@@ -20,6 +43,12 @@ export type Question = {
   given: string;
   shape: string[];
   hints: string[];
+  /** English Language: this question is about the sheet's source pages. */
+  source?: Source;
+  /** The lines the question limits her to, inclusive. */
+  focus?: { from: number; to: number };
+  /** Tick-box questions only. */
+  parts?: TickPart[];
 };
 
 export type SheetSummary = {
@@ -78,8 +107,16 @@ export async function getSheet(id: string) {
   }
 
   const marks = await listMarks(id);
+  const sourcePages = await listSourcePages(id);
 
-  return { sheet: sheetRes.rows[0] as Sheet, answers, flags, answerTimes, marks };
+  return {
+    sheet: sheetRes.rows[0] as Sheet,
+    answers,
+    flags,
+    answerTimes,
+    marks,
+    sourcePages,
+  };
 }
 
 /**
@@ -323,6 +360,9 @@ export async function listOtherAnswers(
       AND a.user_id = ${USER_ID}
       AND a.question_index <> ${excludeIndex}
       AND length(trim(a.answer)) > 0
+      -- A tick-box answer is a list of choices rather than writing, so it
+      -- has nothing the marker could point her back to.
+      AND COALESCE(s.questions -> a.question_index ->> 'type', '') <> 'tick'
     ORDER BY a.updated_at DESC
     LIMIT ${limit};
   `;
@@ -347,9 +387,10 @@ export async function listOtherAnswers(
 export async function getAnswerForMarking(
   sheetId: string,
   questionIndex: number,
-): Promise<{ question: Question; answer: string } | null> {
+): Promise<{ question: Question; answer: string; subject: string } | null> {
   const res = await sql`
     SELECT s.questions -> ${questionIndex}::int AS question,
+           s.subject AS subject,
            COALESCE(a.answer, '') AS answer
     FROM revision_sheet s
     LEFT JOIN revision_answer a
@@ -359,7 +400,11 @@ export async function getAnswerForMarking(
   `;
   const row = res.rows[0];
   if (!row || row.question === null) return null;
-  return { question: row.question as Question, answer: row.answer as string };
+  return {
+    question: row.question as Question,
+    answer: row.answer as string,
+    subject: (row.subject as string) ?? "",
+  };
 }
 
 /* One statement, because revision_answer.sheet_id cascades on delete. The
@@ -368,4 +413,56 @@ export async function getAnswerForMarking(
    needed to close one. */
 export async function deleteSheet(id: string) {
   await sql`DELETE FROM revision_sheet WHERE id = ${id} AND user_id = ${USER_ID};`;
+}
+
+/* ---------- source pages ---------- */
+
+export type SourcePage = { mediaType: string; data: string };
+
+/**
+ * Store a sheet's source pages, in order. Called once, straight after the
+ * sheet is created, so there is nothing to replace.
+ */
+export async function saveSourcePages(sheetId: string, pages: SourcePage[]) {
+  for (let i = 0; i < pages.length; i++) {
+    await sql`
+      INSERT INTO revision_source (sheet_id, user_id, position, media_type, data)
+      VALUES (${sheetId}, ${USER_ID}, ${i}, ${pages[i].mediaType}, ${pages[i].data})
+      ON CONFLICT (sheet_id, user_id, position)
+      DO UPDATE SET media_type = EXCLUDED.media_type, data = EXCLUDED.data;
+    `;
+  }
+}
+
+/**
+ * A sheet's source pages, in order. Empty for any sheet without them, and
+ * empty rather than an error if the table has not been created yet, so every
+ * other sheet still opens.
+ */
+export async function listSourcePages(sheetId: string): Promise<SourcePage[]> {
+  try {
+    const res = await sql`
+      SELECT media_type, data
+      FROM revision_source
+      WHERE sheet_id = ${sheetId} AND user_id = ${USER_ID}
+      ORDER BY position;
+    `;
+    return res.rows.map((r) => ({
+      mediaType: r.media_type as string,
+      data: r.data as string,
+    }));
+  } catch (err) {
+    if (isMissingTable(err)) {
+      console.error(
+        "[revision-db] revision_source is missing. Run scripts/schema.sql to create it.",
+      );
+      return [];
+    }
+    throw err;
+  }
+}
+
+/** True if the error is a Postgres "relation does not exist". */
+export function missingTable(err: unknown): boolean {
+  return isMissingTable(err);
 }

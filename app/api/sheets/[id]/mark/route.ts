@@ -4,8 +4,11 @@ import {
   listOtherAnswers,
   saveMark,
   listMarks,
+  listSourcePages,
 } from "@/lib/revision-db";
 import { withSession } from "@/lib/session";
+import { ENGLISH_SYSTEM } from "@/lib/english-marking-prompt";
+import { isEnglishLanguage } from "@/lib/english-paper";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -348,6 +351,28 @@ const MARK_SCHEMA = {
   ],
 } as const;
 
+/**
+ * The English Language marker returns the same shape plus the two halves of
+ * the writing question's mark, which are scored separately (24 for content,
+ * 16 for accuracy) and mean more to her apart than added up. -1 on every
+ * other question.
+ */
+const ENGLISH_SCHEMA = {
+  ...MARK_SCHEMA,
+  properties: {
+    ...MARK_SCHEMA.properties,
+    contentMark: {
+      type: "integer",
+      description: "Writing question only: content and organisation, out of 24. -1 otherwise.",
+    },
+    accuracyMark: {
+      type: "integer",
+      description: "Writing question only: technical accuracy, out of 16. -1 otherwise.",
+    },
+  },
+  required: [...MARK_SCHEMA.required, "contentMark", "accuracyMark"],
+} as const;
+
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 const int = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? Math.round(v) : null;
@@ -390,6 +415,16 @@ export const POST = withSession<{ params: Promise<{ id: string }> }>(
       }
 
       const q = found.question;
+      const english = isEnglishLanguage(found.subject);
+
+      // Checked in the browser against the paper's own answers. Nothing for a
+      // model to judge, and nothing worth paying for.
+      if (q.type === "tick") {
+        return Response.json(
+          { error: "Tick-box answers are checked as you pick them." },
+          { status: 400 },
+        );
+      }
 
       // Reference only, fenced, and capped. Her own work on her own sheet, so
       // the cost is low and the payoff is the "you already wrote this on the
@@ -422,11 +457,29 @@ export const POST = withSession<{ params: Promise<{ id: string }> }>(
               FENCE_CLOSE,
             ].join("\n");
 
+      // The source goes in as images of her own booklet pages, the same pages
+      // her screen shows, with the line numbers printed in the margin. Not as
+      // text: the extracts are mostly copyrighted, and the pages are what she
+      // is reading anyway.
+      const pages = q.source ? await listSourcePages(id) : [];
+      const sourceText = q.source
+        ? [
+            "",
+            pages.length > 0
+              ? "The source is in the page images above. Line numbers are printed in the margin."
+              : "The source pages could not be loaded, so mark without checking quotes against the text.",
+            q.focus
+              ? `This question limits her to lines ${q.focus.from} to ${q.focus.to}.`
+              : "This question is about the whole source.",
+          ].join("\n")
+        : "";
+
       const userText =
         [
           `Question: ${q.prompt}`,
           q.label ? `Type and marks: ${q.label}` : "",
           q.given ? `Given material: ${q.given}` : "",
+          sourceText,
           "",
           "Her answer:",
           answer,
@@ -444,7 +497,10 @@ export const POST = withSession<{ params: Promise<{ id: string }> }>(
             effort: EFFORT,
             format: {
               type: "json_schema",
-              schema: MARK_SCHEMA as unknown as Record<string, unknown>,
+              schema: (english ? ENGLISH_SCHEMA : MARK_SCHEMA) as unknown as Record<
+                string,
+                unknown
+              >,
             },
           },
           /* One explicit breakpoint at the end of the system prompt, rather
@@ -463,9 +519,34 @@ export const POST = withSession<{ params: Promise<{ id: string }> }>(
              Editing the prompt above invalidates the entry, so the first call
              after a deploy pays the write again. Two calls to break even. */
           system: [
-            { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
+            {
+              type: "text",
+              text: english ? ENGLISH_SYSTEM : SYSTEM,
+              cache_control: { type: "ephemeral" },
+            },
           ],
-          messages: [{ role: "user", content: userText }],
+          messages: [
+            {
+              role: "user",
+              content: [
+                ...pages.map((pg, i) => ({
+                  type: "image" as const,
+                  source: {
+                    type: "base64" as const,
+                    media_type: pg.mediaType as "image/jpeg" | "image/png" | "image/webp",
+                    data: pg.data,
+                  },
+                  // The pages are the same for every answer on the paper, so
+                  // a second breakpoint after the last one caches them for a
+                  // "mark everything" run, which marks four answers in a row.
+                  ...(i === pages.length - 1
+                    ? { cache_control: { type: "ephemeral" as const } }
+                    : {}),
+                })),
+                { type: "text" as const, text: userText },
+              ],
+            },
+          ],
         })
         .finalMessage();
 
@@ -543,6 +624,15 @@ export const POST = withSession<{ params: Promise<{ id: string }> }>(
           fixes: strings(spelling.fixes, 5),
         },
         markSchemeWording: str(raw.markSchemeWording),
+        // The writing question's two halves, kept only when both came back as
+        // real numbers inside their ranges.
+        split: (() => {
+          const c = int(raw.contentMark);
+          const a = int(raw.accuracyMark);
+          return english && c !== null && a !== null && c >= 0 && c <= 24 && a >= 0 && a <= 16
+            ? { content: c, accuracy: a }
+            : null;
+        })(),
       };
 
       if (feedback.mark === null || feedback.maxMark === null) {

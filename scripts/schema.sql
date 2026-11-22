@@ -1,4 +1,4 @@
--- Ummm Less Panic: the two tables it needs.
+-- Ummm Less Panic: the tables it needs.
 --
 -- Paste this into the Neon console SQL editor and run it. Safe to run again:
 -- every statement is guarded, so a second run changes nothing.
@@ -56,19 +56,37 @@ CREATE TABLE IF NOT EXISTS revision_mark (
   PRIMARY KEY (sheet_id, user_id, question_index)
 );
 
+-- The source pages of an English Language paper, as images of her own
+-- booklet. Stored once per sheet rather than inside every question, and kept
+-- as images: the extracts are mostly copyrighted novels, so the app shows
+-- and marks against the page itself rather than a transcription of it.
+--
+-- Cascades with the sheet like the other two, so deleting a paper takes its
+-- pages with it.
+CREATE TABLE IF NOT EXISTS revision_source (
+  sheet_id    text NOT NULL
+                REFERENCES revision_sheet (id) ON DELETE CASCADE,
+  user_id     text NOT NULL,
+  position    int NOT NULL,
+  media_type  text NOT NULL,
+  data        text NOT NULL,
+  PRIMARY KEY (sheet_id, user_id, position)
+);
+
 COMMIT;
 
 -- Check it worked. Expect six rows for revision_sheet, six for
--- revision_answer, eleven for revision_mark, and a cascading foreign key on
--- each of the two child tables.
+-- revision_answer, eleven for revision_mark, five for revision_source, and a
+-- cascading foreign key on each of the three child tables.
 SELECT table_name, column_name, data_type
 FROM information_schema.columns
 WHERE table_schema = 'public'
-  AND table_name IN ('revision_sheet', 'revision_answer', 'revision_mark')
+  AND table_name IN ('revision_sheet', 'revision_answer', 'revision_mark', 'revision_source')
 ORDER BY table_name, ordinal_position;
 
 SELECT conrelid::regclass AS child_table, conname, confdeltype
 FROM pg_constraint
-WHERE conrelid IN ('revision_answer'::regclass, 'revision_mark'::regclass)
+WHERE conrelid IN ('revision_answer'::regclass, 'revision_mark'::regclass,
+                   'revision_source'::regclass)
   AND contype = 'f'
 ORDER BY 1;
