@@ -14,18 +14,16 @@ import type { StoredMark } from "./marking";
 export type QuestionType = "short" | "long" | "judge" | "tick" | "write";
 
 /**
- * A reading source, as printed. English Language papers number the lines of
- * the extract and the questions point at them ("lines 6 to 14"), so the lines
- * are kept exactly as they break on the page: line n is lines[n - 1]. Blank
- * gaps between paragraphs are not numbered on the paper and are not lines
- * here either; breaks lists the line numbers that start a new paragraph so
- * the page can still show them.
+ * Marks a question as being about the sheet's reading source.
+ *
+ * The source itself is not text. English Language extracts are mostly from
+ * copyrighted novels, so the app keeps images of her own booklet pages, in
+ * revision_source, and shows and marks against those. All a question carries
+ * is the last line number printed on the source, so its line ranges can be
+ * checked and "to the end" has a number.
  */
 export type Source = {
-  /** The boxed introduction above the extract, if there is one. */
-  intro: string;
-  lines: string[];
-  breaks: number[];
+  lines: number;
 };
 
 /** One part of a tick-box question: pick one of a few options. */
@@ -45,9 +43,7 @@ export type Question = {
   given: string;
   shape: string[];
   hints: string[];
-  /** English Language: the extract this question is about. Stored on each
-      question rather than on the sheet, so no table changes are needed and
-      the marker gets it with the question. */
+  /** English Language: this question is about the sheet's source pages. */
   source?: Source;
   /** The lines the question limits her to, inclusive. */
   focus?: { from: number; to: number };
@@ -111,8 +107,16 @@ export async function getSheet(id: string) {
   }
 
   const marks = await listMarks(id);
+  const sourcePages = await listSourcePages(id);
 
-  return { sheet: sheetRes.rows[0] as Sheet, answers, flags, answerTimes, marks };
+  return {
+    sheet: sheetRes.rows[0] as Sheet,
+    answers,
+    flags,
+    answerTimes,
+    marks,
+    sourcePages,
+  };
 }
 
 /**
@@ -409,4 +413,56 @@ export async function getAnswerForMarking(
    needed to close one. */
 export async function deleteSheet(id: string) {
   await sql`DELETE FROM revision_sheet WHERE id = ${id} AND user_id = ${USER_ID};`;
+}
+
+/* ---------- source pages ---------- */
+
+export type SourcePage = { mediaType: string; data: string };
+
+/**
+ * Store a sheet's source pages, in order. Called once, straight after the
+ * sheet is created, so there is nothing to replace.
+ */
+export async function saveSourcePages(sheetId: string, pages: SourcePage[]) {
+  for (let i = 0; i < pages.length; i++) {
+    await sql`
+      INSERT INTO revision_source (sheet_id, user_id, position, media_type, data)
+      VALUES (${sheetId}, ${USER_ID}, ${i}, ${pages[i].mediaType}, ${pages[i].data})
+      ON CONFLICT (sheet_id, user_id, position)
+      DO UPDATE SET media_type = EXCLUDED.media_type, data = EXCLUDED.data;
+    `;
+  }
+}
+
+/**
+ * A sheet's source pages, in order. Empty for any sheet without them, and
+ * empty rather than an error if the table has not been created yet, so every
+ * other sheet still opens.
+ */
+export async function listSourcePages(sheetId: string): Promise<SourcePage[]> {
+  try {
+    const res = await sql`
+      SELECT media_type, data
+      FROM revision_source
+      WHERE sheet_id = ${sheetId} AND user_id = ${USER_ID}
+      ORDER BY position;
+    `;
+    return res.rows.map((r) => ({
+      mediaType: r.media_type as string,
+      data: r.data as string,
+    }));
+  } catch (err) {
+    if (isMissingTable(err)) {
+      console.error(
+        "[revision-db] revision_source is missing. Run scripts/schema.sql to create it.",
+      );
+      return [];
+    }
+    throw err;
+  }
+}
+
+/** True if the error is a Postgres "relation does not exist". */
+export function missingTable(err: unknown): boolean {
+  return isMissingTable(err);
 }

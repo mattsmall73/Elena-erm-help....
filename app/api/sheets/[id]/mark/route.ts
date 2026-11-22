@@ -4,6 +4,7 @@ import {
   listOtherAnswers,
   saveMark,
   listMarks,
+  listSourcePages,
 } from "@/lib/revision-db";
 import { withSession } from "@/lib/session";
 import { ENGLISH_SYSTEM } from "@/lib/english-marking-prompt";
@@ -456,21 +457,21 @@ export const POST = withSession<{ params: Promise<{ id: string }> }>(
               FENCE_CLOSE,
             ].join("\n");
 
-      // The source goes in numbered, exactly as her screen shows it, so the
-      // marker can check her quotes and point her at a line by its number.
+      // The source goes in as images of her own booklet pages, the same pages
+      // her screen shows, with the line numbers printed in the margin. Not as
+      // text: the extracts are mostly copyrighted, and the pages are what she
+      // is reading anyway.
+      const pages = q.source ? await listSourcePages(id) : [];
       const sourceText = q.source
         ? [
             "",
-            "The source, one numbered line per printed line:",
-            q.source.intro ? `Introduction: ${q.source.intro}` : "",
-            ...q.source.lines.map((l, i) => `${i + 1}  ${l}`),
-            "",
+            pages.length > 0
+              ? "The source is in the page images above. Line numbers are printed in the margin."
+              : "The source pages could not be loaded, so mark without checking quotes against the text.",
             q.focus
               ? `This question limits her to lines ${q.focus.from} to ${q.focus.to}.`
               : "This question is about the whole source.",
-          ]
-            .filter((l) => l !== "")
-            .join("\n")
+          ].join("\n")
         : "";
 
       const userText =
@@ -524,7 +525,28 @@ export const POST = withSession<{ params: Promise<{ id: string }> }>(
               cache_control: { type: "ephemeral" },
             },
           ],
-          messages: [{ role: "user", content: userText }],
+          messages: [
+            {
+              role: "user",
+              content: [
+                ...pages.map((pg, i) => ({
+                  type: "image" as const,
+                  source: {
+                    type: "base64" as const,
+                    media_type: pg.mediaType as "image/jpeg" | "image/png" | "image/webp",
+                    data: pg.data,
+                  },
+                  // The pages are the same for every answer on the paper, so
+                  // a second breakpoint after the last one caches them for a
+                  // "mark everything" run, which marks four answers in a row.
+                  ...(i === pages.length - 1
+                    ? { cache_control: { type: "ephemeral" as const } }
+                    : {}),
+                })),
+                { type: "text" as const, text: userText },
+              ],
+            },
+          ],
         })
         .finalMessage();
 

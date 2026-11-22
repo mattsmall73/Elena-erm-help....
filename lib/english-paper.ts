@@ -1,4 +1,4 @@
-import type { Question, Source, TickPart } from "./revision-db";
+import type { Question, TickPart } from "./revision-db";
 
 /**
  * AQA English Language Paper 1, turned into question cards.
@@ -11,9 +11,9 @@ import type { Question, Source, TickPart } from "./revision-db";
  * sheet she builds, which matters more than variety: the point is that the
  * shape of each answer becomes automatic.
  *
- * What the model supplies is only what changes per paper: the source, the
- * question wording, the line numbers, the tick-box answers, and a few
- * pointers into this particular extract.
+ * What the model supplies is only what changes per paper: the question
+ * wording, the line numbers, the tick-box answers, and a few pointers into
+ * this particular extract. The source itself stays as images of her pages.
  */
 
 export const ENGLISH_SUBJECT = "English Language";
@@ -97,14 +97,15 @@ const clampLine = (n: number, max: number) =>
   Math.max(1, Math.min(Number.isFinite(n) ? Math.round(n) : 1, max));
 
 /**
- * Turn a read paper and its source into question cards.
+ * Turn a read paper into question cards.
  *
  * Line numbers from the model are clamped into the source, since a focus
  * outside it would highlight nothing and the marker would read it as a
  * request for lines that do not exist.
  */
-export function paperToQuestions(paper: ReadPaper, source: Source): Question[] {
-  const max = source.lines.length;
+export function paperToQuestions(paper: ReadPaper, lastLine: number): Question[] {
+  const max = Math.max(1, lastLine);
+  const source = { lines: max };
   const out: Question[] = [];
 
   if (paper.q1.present && paper.q1.parts.length > 0) {

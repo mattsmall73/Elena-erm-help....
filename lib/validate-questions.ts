@@ -20,9 +20,12 @@ export const SHEET_LIMITS = {
   idChars: 64,
   /* An English Language source is about fifty printed lines. Generous, since
      a long extract over two pages runs to ninety. */
-  sourceLines: 200,
-  sourceLineChars: 400,
-  sourceIntroChars: 1000,
+  sourceLines: 400,
+  /* Source page images, posted with the sheet. A page rendered at 1400px is
+     about 300 KB of base64. */
+  sourcePages: 4,
+  sourcePageChars: 1_500_000,
+  sourceTotalChars: 3_600_000,
   tickParts: 8,
   tickOptions: 6,
   tickChars: 300,
@@ -33,19 +36,12 @@ const QUESTION_TYPES: readonly QuestionType[] = ["short", "long", "judge", "tick
 const isInt = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v);
 
-/** A source, rebuilt from known fields, or null if anything is off. */
+/** A source marker: the last line number printed on the source. */
 function source(v: unknown): Source | null {
   if (!isObject(v)) return null;
-  const intro = str(v.intro ?? "", SHEET_LIMITS.sourceIntroChars);
-  const lines = strings(v.lines, SHEET_LIMITS.sourceLines, SHEET_LIMITS.sourceLineChars);
-  if (intro === null || lines === null || lines.length === 0) return null;
-  const rawBreaks = Array.isArray(v.breaks) ? v.breaks : [];
-  // Out-of-range breaks are dropped rather than rejected: a wrong paragraph
-  // break costs nothing but looks, and the lines themselves are what matter.
-  const breaks = rawBreaks
-    .filter((b): b is number => isInt(b) && b >= 1 && b <= lines.length)
-    .slice(0, SHEET_LIMITS.sourceLines);
-  return { intro, lines, breaks };
+  return isInt(v.lines) && v.lines >= 1 && v.lines <= SHEET_LIMITS.sourceLines
+    ? { lines: v.lines }
+    : null;
 }
 
 function tickPart(v: unknown): TickPart | null {
@@ -135,7 +131,7 @@ function question(v: unknown): Question | null | "drop" {
 
   if (v.focus !== undefined && v.focus !== null) {
     const f = v.focus as Record<string, unknown>;
-    const max = out.source?.lines.length ?? 0;
+    const max = out.source?.lines ?? 0;
     // A focus only means something against a source, and only inside it.
     if (!isObject(f) || !isInt(f.from) || !isInt(f.to) || max === 0) return null;
     const from = Math.max(1, Math.min(f.from, max));
@@ -211,4 +207,38 @@ export function validateSheet(input: unknown): ValidatedSheet {
   }
 
   return { ok: true, id, title: title.trim(), subject: subject.trim(), questions };
+}
+
+const PAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/**
+ * Source page images posted with an English Language sheet. Optional: every
+ * other sheet sends none. Bounded so a large body cannot reach the table.
+ */
+export function validateSourcePages(
+  v: unknown,
+): { ok: true; pages: { mediaType: string; data: string }[] } | { ok: false; reason: string } {
+  if (v === undefined || v === null) return { ok: true, pages: [] };
+  if (!Array.isArray(v) || v.length > SHEET_LIMITS.sourcePages) {
+    return { ok: false, reason: "Too many source pages for one paper." };
+  }
+  let total = 0;
+  const pages: { mediaType: string; data: string }[] = [];
+  for (const raw of v) {
+    if (!isObject(raw)) return { ok: false, reason: "A source page is malformed." };
+    const mediaType = typeof raw.mediaType === "string" ? raw.mediaType : "";
+    const data = typeof raw.data === "string" ? raw.data : "";
+    if (!PAGE_TYPES.includes(mediaType) || !data || !/^[A-Za-z0-9+/=]+$/.test(data)) {
+      return { ok: false, reason: "A source page is malformed." };
+    }
+    if (data.length > SHEET_LIMITS.sourcePageChars) {
+      return { ok: false, reason: "A source page is too big." };
+    }
+    total += data.length;
+    pages.push({ mediaType, data });
+  }
+  if (total > SHEET_LIMITS.sourceTotalChars) {
+    return { ok: false, reason: "The source pages are too big together." };
+  }
+  return { ok: true, pages };
 }

@@ -17,7 +17,7 @@ import {
   runningGrade,
   type StoredMark,
 } from "@/lib/marking";
-import type { Question, Sheet, SheetSummary, Source } from "@/lib/revision-db";
+import type { Question, Sheet, SheetSummary } from "@/lib/revision-db";
 import SourcePanel from "@/components/SourcePanel";
 import { downscaleImage } from "@/lib/downscale-image";
 import {
@@ -218,8 +218,8 @@ export default function UmmmLessPanic() {
   const [paperNote, setPaperNote] = useState("");
   const readingPaperRef = useRef(false);
 
-  /* Where a tick-box answer is, once she has picked a wrong one. */
-  const [pointLine, setPointLine] = useState(0);
+  /* The open sheet's source pages, as data: URLs, for English papers. */
+  const [sourcePages, setSourcePages] = useState<string[]>([]);
 
   const barRef = useRef<HTMLElement | null>(null);
   const stopMarkAll = useRef(false);
@@ -332,10 +332,14 @@ export default function UmmmLessPanic() {
       flags: Record<number, boolean>;
       answerTimes?: Record<number, number>;
       marks?: MarkRecord[];
+      sourcePages?: { mediaType: string; data: string }[];
     }>(res);
 
     if (out.ok) {
       setSheet(out.data.sheet);
+      setSourcePages(
+        (out.data.sourcePages ?? []).map((p) => `data:${p.mediaType};base64,${p.data}`),
+      );
       setAnswers(out.data.answers);
       setFlags(out.data.flags);
       setAnswerTimes(out.data.answerTimes ?? {});
@@ -582,7 +586,9 @@ export default function UmmmLessPanic() {
   }
 
   /* The pages for one paper, ready to post. */
-  async function gatherPaperFiles(): Promise<PaperFile[] | string> {
+  async function gatherPaperFiles(): Promise<
+    { files: PaperFile[]; pdf: Uint8Array | null } | string
+  > {
     if (paperMode === "pdf") {
       if (!booklet) return "Choose the booklet first.";
       const pages = parsePages(pageText, bookletPages);
@@ -597,11 +603,12 @@ export default function UmmmLessPanic() {
         pages.map((n) => n - 1),
       );
       copied.forEach((pg) => cut.addPage(pg));
-      const data = toBase64(await cut.save());
+      const pdf = await cut.save();
+      const data = toBase64(pdf);
       if (data.length > MAX_PAPER_CHARS) {
         return "Those pages are too big to send together. Try fewer pages.";
       }
-      return [{ mediaType: "application/pdf", data }];
+      return { files: [{ mediaType: "application/pdf", data }], pdf };
     }
 
     if (photos.length === 0) return "Add photos of the pages first.";
@@ -620,14 +627,15 @@ export default function UmmmLessPanic() {
     if (total > MAX_PAPER_CHARS) {
       return "Those photos are too big to send together. Try fewer, or crop them.";
     }
-    return out;
+    return { files: out, pdf: null };
   }
 
   /* Reads one English Language paper into a sheet.
 
-     Two calls: the source first, then the questions read against it. Guarded
-     with a ref as well as state, because a second press landing before the
-     re-render would read the paper twice and pay for it twice. */
+     One call reads the pages; the source pages are then drawn as images here
+     and saved with the sheet. Guarded with a ref as well as state, because a
+     second press landing before the re-render would read the paper twice and
+     pay for it twice. */
   async function readPaper() {
     if (readingPaperRef.current) return;
     readingPaperRef.current = true;
@@ -637,53 +645,56 @@ export default function UmmmLessPanic() {
 
     try {
       setPaperNote("Getting the pages ready");
-      const files = await gatherPaperFiles();
-      if (typeof files === "string") {
-        setError(files);
+      const gathered = await gatherPaperFiles();
+      if (typeof gathered === "string") {
+        setError(gathered);
+        return;
+      }
+      const { files, pdf } = gathered;
+
+      setPaperNote("Reading the paper. About a minute.");
+      const res = await fetch("/api/sheets/paper", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ files }),
+      });
+      const read = await readResponse<{
+        paperName: string;
+        sourcePages: number[];
+        questions: Question[];
+      }>(res);
+      if (!read.ok) {
+        setError(read.error + " Nothing was saved.");
         return;
       }
 
-      setPaperNote("Reading the source. About half a minute.");
-      const srcRes = await fetch("/api/sheets/paper", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ step: "source", files }),
-      });
-      const src = await readResponse<{ paperName: string; source: Source }>(srcRes);
-      if (!src.ok) {
-        setError(src.error);
-        return;
-      }
-
-      setPaperNote(
-        `Got the source, ${src.data.source.lines.length} lines. Now the questions. About a minute.`,
-      );
-      const qRes = await fetch("/api/sheets/paper", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          step: "questions",
-          files,
-          source: src.data.source,
-          paperName: src.data.paperName,
-        }),
-      });
-      const qs = await readResponse<{ questions: Question[] }>(qRes);
-      if (!qs.ok) {
-        setError(qs.error + " Nothing was saved.");
+      // The source pages, as images, from the pages she already sent. Done
+      // here rather than on the server, which has no way to draw a PDF page.
+      setPaperNote("Putting the source pages in");
+      const wanted = read.data.sourcePages;
+      const pages = pdf
+        ? await (await import("@/lib/render-pdf-pages")).renderPdfPages(pdf, wanted)
+        : wanted
+            .filter((n) => n >= 1 && n <= files.length)
+            .map((n) => files[n - 1]);
+      if (pages.length === 0) {
+        setError(
+          "Couldn't find the source page among those. Check the page numbers include the one headed Source A. Nothing was saved.",
+        );
         return;
       }
 
       setPaperNote("Saving it");
       const title =
-        paperName.trim() || src.data.paperName.trim() || "English Language paper";
+        paperName.trim() || read.data.paperName.trim() || "English Language paper";
       const saveRes = await fetch("/api/sheets", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title,
           subject: ENGLISH_SUBJECT,
-          questions: qs.data.questions,
+          questions: read.data.questions,
+          sourcePages: pages,
         }),
       });
       const saved = await readResponse<{ id: string }>(saveRes);
@@ -719,16 +730,14 @@ export default function UmmmLessPanic() {
   }
 
   /* A tick-box pick. Saved like any answer, checked straight away in the
-     page. A wrong pick points at the line the answer is on rather than giving
-     the answer, so finding it is still hers. */
+     page. A wrong pick names the line the answer is on rather than giving the
+     answer, so finding it is still hers. */
   function pickTick(idx: number, part: number, option: number) {
     const q = sheet?.questions[idx];
     if (!q || q.type !== "tick" || !q.parts) return;
     const ticks = readTicks(answers[idx] ?? "", q.parts.length);
     ticks[part] = option;
     onType(writeTicks(ticks));
-    const p = q.parts[part];
-    setPointLine(p.correct >= 0 && option !== p.correct && p.line > 0 ? p.line : 0);
   }
 
   function startRun(kind: string) {
@@ -810,7 +819,6 @@ export default function UmmmLessPanic() {
     setPos(next);
     setHintsShown(0);
     setOpenPanel("");
-    setPointLine(0);
     window.scrollTo({ top: 0 });
   }
 
@@ -844,7 +852,6 @@ export default function UmmmLessPanic() {
       }
     }
     setHintsShown(0);
-    setPointLine(0);
     flushSave();
     if (pos + 1 >= queue.length) setScreen("end");
     else setPos(pos + 1);
@@ -1150,8 +1157,8 @@ section{margin-bottom:2rem;page-break-inside:avoid}
         </button>
         <h1 className={h1}>Add an English Language paper</h1>
         <p className={lede}>
-          One paper from your booklet at a time. It reads the source with its line
-          numbers and the questions, and makes a sheet you can type into and get marked.
+          One paper from your booklet at a time. It reads the questions, keeps the
+          source page beside them, and makes a sheet you can type into and get marked.
         </p>
 
         <div className="mb-5 flex gap-2" role="radiogroup" aria-label="Where the paper comes from">
@@ -1266,8 +1273,7 @@ section{margin-bottom:2rem;page-break-inside:avoid}
         )}
         {!readingPaper && (
           <p className="text-calm-soft mt-6 text-sm">
-            Reading a paper costs about 25p. Check the first lines of the source
-            against your booklet when it opens.
+            Reading a paper costs about 20p.
           </p>
         )}
       </Surface>
@@ -1433,13 +1439,13 @@ section{margin-bottom:2rem;page-break-inside:avoid}
         <div
           className={
             q.source
-              ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]"
+              ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"
               : ""
           }
         >
         {q.source && (
           <div className="lg:sticky lg:top-4">
-            <SourcePanel source={q.source} focus={q.focus} pointLine={pointLine || undefined} />
+            <SourcePanel pages={sourcePages} focus={q.focus} />
           </div>
         )}
         <div>
@@ -1506,8 +1512,8 @@ section{margin-bottom:2rem;page-break-inside:avoid}
                               ? `Yes. It is in line ${part.line}.`
                               : "Yes."
                             : part.line > 0
-                              ? `Not that one. Have another look at line ${part.line}, it is marked in the source.`
-                              : "Not that one. Have another look at the marked lines."}
+                              ? `Not that one. Have another look at line ${part.line} on the source page.`
+                              : "Not that one. Have another look at those lines."}
                       </p>
                     )}
                   </div>

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { Source, TickPart } from "@/lib/revision-db";
+import type { TickPart } from "@/lib/revision-db";
 import { paperToQuestions, type ReadPaper } from "@/lib/english-paper";
 import { withSession } from "@/lib/session";
 
@@ -11,31 +11,24 @@ export const maxDuration = 120;
  * Reads one English Language Paper 1 from her booklet: pages cut from the PDF
  * in her browser, or photos of the printed pages.
  *
- * Two steps, called one after the other by the page, rather than one call
- * doing both. Transcribing a fifty-line extract and then reading five
- * questions against it is a long turn, and two shorter ones keep each well
- * inside maxDuration. It also means the questions step reads the source as
- * numbered text, which is what lets it get the line numbers right.
+ * It reads the pages and writes no source text back. The extracts are mostly
+ * from copyrighted novels, and the API's content filter blocks a model
+ * writing out long published passages word for word, which is what the first
+ * version of this route asked for. So the source stays as images of her own
+ * booklet pages, shown in the app and sent to the marker, and this route
+ * returns only what the app needs around them: which pages hold the source,
+ * the last line number, the questions and their line ranges, the tick-box
+ * answers, and a few short pointers into the text.
  *
- *   step "source"     pages -> the extract, line by line as printed
- *   step "questions"  pages + that source -> the five question cards
- *
- * Nothing from the booklet is stored anywhere but her own sheet. The pages go
- * to the model and are not kept.
+ * Nothing from the booklet is stored anywhere but her own sheet.
  */
 
 const MODEL = "claude-opus-5";
 const MAX_TOKENS = 16000;
-
-/* Transcription is reading rather than reasoning, so it runs light. The
-   questions step works out the tick-box answers and the line pointers, which
-   is worth a little more. */
-const EFFORT_SOURCE = "low" as const;
-const EFFORT_QUESTIONS = "medium" as const;
+const EFFORT = "medium" as const;
 
 /* The platform rejects bodies over 4.5 MB. One paper's pages cut from the
-   booklet come to about 1.4 MB at most, so this leaves room for the source
-   text that rides along on the second step. */
+   booklet come to about 1.4 MB at most. */
 const MAX_FILES = 10;
 const MAX_DATA_CHARS = 4_000_000;
 
@@ -44,44 +37,19 @@ type Upload = { mediaType: string; data: string };
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 type ImageType = (typeof IMAGE_TYPES)[number];
 
-const SOURCE_SYSTEM = `You transcribe the reading source from the pages of an AQA GCSE English Language Paper 1 practice booklet, for a student who will read it on screen next to her answer.
+const QUESTIONS_SYSTEM = `You read one AQA GCSE English Language Paper 1 from a practice booklet, for a revision app used by a sixteen-year-old with dyslexia and ADHD.
 
-The pages may include the source, the question pages, sample answers written by other students, planning grids and pictures. You want only the source: the numbered extract headed "Source A" or printed with line numbers down the left margin.
+You are given photos or scans of the pages, numbered in the order given. They may include the source, the question pages, sample answers written by other students, planning grids and pictures. Ignore the sample answers and grids.
 
-Return:
+Never copy out the source. The app shows her the page itself. You may quote at most four words of the source anywhere in your answer.
+
+The source
 
 - paperName: the exam series and a short handle for the extract, from the page headings and the text. "June 2017 · Rosabel", "November 2018 · T-Rex". Use the main character's name or the obvious subject.
-- intro: the boxed introduction printed above the extract, word for word. Empty string if there is none.
-- lines: the extract, one entry per printed line, exactly as it breaks on the page.
-- breaks: the line numbers that start a new paragraph or a new line of dialogue, apart from line 1.
+- sourcePages: the page numbers, counting from 1 in the order given, that hold the numbered extract headed "Source A" or printed with line numbers down the margin. Only the pages with the extract itself, never a question page that reprints part of it.
+- lastLine: the number of the last line of the extract. Count from the margin numbers: every printed line of text counts, and blank space between paragraphs does not.
 
-How to number the lines. This matters more than anything else, because the questions say "lines 6 to 14" and she will look for them:
-
-- The margin numbers are your guide. The line printed beside the number n must be entry n in your list, counting from 1.
-- Every printed line of text counts, including short ones such as a one-word line of dialogue. Blank space between paragraphs is not a line.
-- Leave the margin numbers themselves out of the text.
-- If the extract runs onto a second page, carry on counting.
-- A question page may reprint part of the extract for Question 2. Do not add it a second time.
-
-Copy the writer's words, spelling and punctuation exactly as printed, including their dashes and quotation marks. If a word cannot be read, write [?] in its place rather than guessing.
-
-If there is no numbered source on these pages, return an empty list of lines.`;
-
-const SOURCE_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    paperName: { type: "string" },
-    intro: { type: "string" },
-    lines: { type: "array", items: { type: "string" } },
-    breaks: { type: "array", items: { type: "integer" } },
-  },
-  required: ["paperName", "intro", "lines", "breaks"],
-} as const;
-
-const QUESTIONS_SYSTEM = `You read the questions on one AQA GCSE English Language Paper 1 from a practice booklet, for a revision app used by a sixteen-year-old with dyslexia and ADHD.
-
-You are given photos or scans of the pages and the source already transcribed, one numbered line per line. Use those line numbers for everything. The pages may also include sample answers by other students and planning grids. Ignore them.
+Read the line numbers from the margin for everything below. The questions say "lines 6 to 14" and she will look for those numbers on the page.
 
 The paper has five questions. For each, set present to false if it is not on these pages, and leave its other fields empty or zero.
 
@@ -146,6 +114,9 @@ const QUESTIONS_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
+    paperName: { type: "string" },
+    sourcePages: { type: "array", items: { type: "integer" } },
+    lastLine: { type: "integer" },
     q1: {
       type: "object",
       additionalProperties: false,
@@ -205,7 +176,7 @@ const QUESTIONS_SCHEMA = {
       required: ["present", "context", "optionA", "optionB", "hasPicture"],
     },
   },
-  required: ["q1", "q2", "q3", "q4", "q5"],
+  required: ["paperName", "sourcePages", "lastLine", "q1", "q2", "q3", "q4", "q5"],
 } as const;
 
 /* ---------- small readers for what comes back ---------- */
@@ -271,22 +242,10 @@ function pageBlocks(files: Upload[]): Anthropic.ContentBlockParam[] {
   );
 }
 
-function readSource(v: unknown): Source | null {
-  const s = obj(v);
-  const lines = strs(s.lines, 200, 400);
-  if (lines.length === 0) return null;
-  const breaks = Array.isArray(s.breaks)
-    ? s.breaks.filter(
-        (b): b is number => typeof b === "number" && Number.isInteger(b) && b > 1 && b <= lines.length,
-      )
-    : [];
-  return { intro: str(s.intro, 1000), lines, breaks };
-}
-
 async function ask(
   system: string,
   schema: object,
-  effort: "low" | "medium",
+  effort: "medium",
   content: Anthropic.ContentBlockParam[],
   tag: string,
 ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
@@ -334,11 +293,6 @@ async function ask(
 export const POST = withSession(async (request) => {
   try {
     const body = obj(await request.json());
-    const step = body.step;
-    if (step !== "source" && step !== "questions") {
-      return Response.json({ error: "Unknown step." }, { status: 400 });
-    }
-
     const files = readUploads(body.files);
     if (typeof files === "string") {
       return Response.json({ error: files }, { status: 400 });
@@ -351,57 +305,35 @@ export const POST = withSession(async (request) => {
       );
     }
 
-    if (step === "source") {
-      const asked = await ask(
-        SOURCE_SYSTEM,
-        SOURCE_SCHEMA,
-        EFFORT_SOURCE,
-        [
-          ...pageBlocks(files),
-          { type: "text", text: "Transcribe the numbered source from these pages." },
-        ],
-        "source",
-      );
-      if (!asked.ok) return Response.json({ error: asked.error }, { status: 502 });
-      const raw = asked.data;
-      const source = readSource(raw);
-      if (!source) {
-        return Response.json(
-          {
-            error:
-              "No numbered source on those pages. Check the page numbers include the one headed Source A.",
-          },
-          { status: 422 },
-        );
-      }
-      return Response.json({ paperName: str(raw.paperName, 120), source });
-    }
-
-    // step === "questions"
-    const source = readSource(body.source);
-    if (!source) {
-      return Response.json({ error: "The source is missing. Start again?" }, { status: 400 });
-    }
-
-    const numbered =
-      (source.intro ? `Introduction: ${source.intro}\n\n` : "") +
-      source.lines.map((l, i) => `${i + 1}  ${l}`).join("\n");
-
     const asked = await ask(
       QUESTIONS_SYSTEM,
       QUESTIONS_SCHEMA,
-      EFFORT_QUESTIONS,
+      EFFORT,
       [
         ...pageBlocks(files),
         {
           type: "text",
-          text: `The source, already transcribed, one numbered line per printed line:\n\n${numbered}\n\nRead the questions on these pages.`,
+          text: `These are ${files.length === 1 && files[0].mediaType === "application/pdf" ? "the pages of one PDF" : `${files.length} photos, in order`}. Read the paper.`,
         },
       ],
-      "questions",
+      "read",
     );
     if (!asked.ok) return Response.json({ error: asked.error }, { status: 502 });
     const raw = asked.data;
+
+    const lastLine = Math.min(400, int(raw.lastLine));
+    if (lastLine < 1) {
+      return Response.json(
+        {
+          error:
+            "No numbered source on those pages. Check the page numbers include the one headed Source A.",
+        },
+        { status: 422 },
+      );
+    }
+    const sourcePages = (Array.isArray(raw.sourcePages) ? raw.sourcePages : [])
+      .filter((n): n is number => typeof n === "number" && Number.isInteger(n) && n >= 1)
+      .slice(0, 4);
 
     const q1 = obj(raw.q1);
     const q2 = obj(raw.q2);
@@ -411,7 +343,7 @@ export const POST = withSession(async (request) => {
 
     const parts: TickPart[] = (Array.isArray(q1.parts) ? q1.parts : [])
       .slice(0, 8)
-      .map((p) => {
+      .map((p: unknown) => {
         const o = obj(p);
         const options = strs(o.options, 6);
         const correct = int(o.correct);
@@ -425,7 +357,7 @@ export const POST = withSession(async (request) => {
       .filter((p) => p.prompt && p.options.length >= 2);
 
     const paper: ReadPaper = {
-      paperName: str(body.paperName, 120),
+      paperName: str(raw.paperName, 120),
       q1: { present: bool(q1.present), from: int(q1.from), to: int(q1.to), parts },
       q2: {
         present: bool(q2.present),
@@ -456,7 +388,7 @@ export const POST = withSession(async (request) => {
       },
     };
 
-    const questions = paperToQuestions(paper, source);
+    const questions = paperToQuestions(paper, lastLine);
     if (questions.length === 0) {
       return Response.json(
         {
@@ -466,7 +398,11 @@ export const POST = withSession(async (request) => {
         { status: 422 },
       );
     }
-    return Response.json({ questions });
+    return Response.json({
+      paperName: paper.paperName,
+      sourcePages,
+      questions,
+    });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       console.error("[sheets/paper] API error", err.status, err.message);
