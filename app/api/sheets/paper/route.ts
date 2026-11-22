@@ -470,8 +470,15 @@ export const POST = withSession(async (request) => {
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       console.error("[sheets/paper] API error", err.status, err.message);
+      // The status and error type go on screen, so a screenshot says what
+      // happened. Neither carries anything private: no key, no request body.
+      const body = err.error as { error?: { type?: unknown } } | undefined;
+      const type = typeof body?.error?.type === "string" ? body.error.type : err.name;
+      const code = [err.status, type].filter(Boolean).join(" ");
       return Response.json(
-        { error: "The paper reader had a hiccup. Give it another go?" },
+        {
+          error: `The paper reader had a hiccup${code ? ` (${code})` : ""}. Give it another go?`,
+        },
         { status: 502 },
       );
     }
