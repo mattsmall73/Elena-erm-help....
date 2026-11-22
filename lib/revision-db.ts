@@ -11,7 +11,32 @@ import type { StoredMark } from "./marking";
    in proxy.ts plus withSession on each route, so this is a partition
    key and nothing more. */
 
-export type QuestionType = "short" | "long" | "judge";
+export type QuestionType = "short" | "long" | "judge" | "tick" | "write";
+
+/**
+ * A reading source, as printed. English Language papers number the lines of
+ * the extract and the questions point at them ("lines 6 to 14"), so the lines
+ * are kept exactly as they break on the page: line n is lines[n - 1]. Blank
+ * gaps between paragraphs are not numbered on the paper and are not lines
+ * here either; breaks lists the line numbers that start a new paragraph so
+ * the page can still show them.
+ */
+export type Source = {
+  /** The boxed introduction above the extract, if there is one. */
+  intro: string;
+  lines: string[];
+  breaks: number[];
+};
+
+/** One part of a tick-box question: pick one of a few options. */
+export type TickPart = {
+  prompt: string;
+  options: string[];
+  /** Index into options, or -1 if the paper could not be checked. */
+  correct: number;
+  /** The source line the answer is on, or 0 if not known. */
+  line: number;
+};
 
 export type Question = {
   label: string;
@@ -20,6 +45,14 @@ export type Question = {
   given: string;
   shape: string[];
   hints: string[];
+  /** English Language: the extract this question is about. Stored on each
+      question rather than on the sheet, so no table changes are needed and
+      the marker gets it with the question. */
+  source?: Source;
+  /** The lines the question limits her to, inclusive. */
+  focus?: { from: number; to: number };
+  /** Tick-box questions only. */
+  parts?: TickPart[];
 };
 
 export type SheetSummary = {
@@ -323,6 +356,9 @@ export async function listOtherAnswers(
       AND a.user_id = ${USER_ID}
       AND a.question_index <> ${excludeIndex}
       AND length(trim(a.answer)) > 0
+      -- A tick-box answer is a list of choices rather than writing, so it
+      -- has nothing the marker could point her back to.
+      AND COALESCE(s.questions -> a.question_index ->> 'type', '') <> 'tick'
     ORDER BY a.updated_at DESC
     LIMIT ${limit};
   `;
@@ -347,9 +383,10 @@ export async function listOtherAnswers(
 export async function getAnswerForMarking(
   sheetId: string,
   questionIndex: number,
-): Promise<{ question: Question; answer: string } | null> {
+): Promise<{ question: Question; answer: string; subject: string } | null> {
   const res = await sql`
     SELECT s.questions -> ${questionIndex}::int AS question,
+           s.subject AS subject,
            COALESCE(a.answer, '') AS answer
     FROM revision_sheet s
     LEFT JOIN revision_answer a
@@ -359,7 +396,11 @@ export async function getAnswerForMarking(
   `;
   const row = res.rows[0];
   if (!row || row.question === null) return null;
-  return { question: row.question as Question, answer: row.answer as string };
+  return {
+    question: row.question as Question,
+    answer: row.answer as string,
+    subject: (row.subject as string) ?? "",
+  };
 }
 
 /* One statement, because revision_answer.sheet_id cascades on delete. The

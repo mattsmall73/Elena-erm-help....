@@ -1,4 +1,4 @@
-import type { Question, QuestionType } from "./revision-db";
+import type { Question, QuestionType, Source, TickPart } from "./revision-db";
 
 /**
  * Bounds for an incoming sheet. Set well above anything real: the history
@@ -18,9 +18,46 @@ export const SHEET_LIMITS = {
   hints: 20,
   hintChars: 1000,
   idChars: 64,
+  /* An English Language source is about fifty printed lines. Generous, since
+     a long extract over two pages runs to ninety. */
+  sourceLines: 200,
+  sourceLineChars: 400,
+  sourceIntroChars: 1000,
+  tickParts: 8,
+  tickOptions: 6,
+  tickChars: 300,
 } as const;
 
-const QUESTION_TYPES: readonly QuestionType[] = ["short", "long", "judge"];
+const QUESTION_TYPES: readonly QuestionType[] = ["short", "long", "judge", "tick", "write"];
+
+const isInt = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v);
+
+/** A source, rebuilt from known fields, or null if anything is off. */
+function source(v: unknown): Source | null {
+  if (!isObject(v)) return null;
+  const intro = str(v.intro ?? "", SHEET_LIMITS.sourceIntroChars);
+  const lines = strings(v.lines, SHEET_LIMITS.sourceLines, SHEET_LIMITS.sourceLineChars);
+  if (intro === null || lines === null || lines.length === 0) return null;
+  const rawBreaks = Array.isArray(v.breaks) ? v.breaks : [];
+  // Out-of-range breaks are dropped rather than rejected: a wrong paragraph
+  // break costs nothing but looks, and the lines themselves are what matter.
+  const breaks = rawBreaks
+    .filter((b): b is number => isInt(b) && b >= 1 && b <= lines.length)
+    .slice(0, SHEET_LIMITS.sourceLines);
+  return { intro, lines, breaks };
+}
+
+function tickPart(v: unknown): TickPart | null {
+  if (!isObject(v)) return null;
+  const prompt = str(v.prompt, SHEET_LIMITS.tickChars);
+  const options = strings(v.options, SHEET_LIMITS.tickOptions, SHEET_LIMITS.tickChars);
+  if (prompt === null || options === null || options.length < 2) return null;
+  const correct =
+    isInt(v.correct) && v.correct >= 0 && v.correct < options.length ? v.correct : -1;
+  const line = isInt(v.line) && v.line > 0 ? v.line : 0;
+  return { prompt, options, correct, line };
+}
 
 export type ValidatedSheet =
   | {
@@ -88,7 +125,37 @@ function question(v: unknown): Question | null | "drop" {
     ? (v.type as QuestionType)
     : "long";
 
-  return { label, type, prompt, given, shape, hints };
+  const out: Question = { label, type, prompt, given, shape, hints };
+
+  if (v.source !== undefined && v.source !== null) {
+    const s = source(v.source);
+    if (s === null) return null;
+    out.source = s;
+  }
+
+  if (v.focus !== undefined && v.focus !== null) {
+    const f = v.focus as Record<string, unknown>;
+    const max = out.source?.lines.length ?? 0;
+    // A focus only means something against a source, and only inside it.
+    if (!isObject(f) || !isInt(f.from) || !isInt(f.to) || max === 0) return null;
+    const from = Math.max(1, Math.min(f.from, max));
+    const to = Math.max(from, Math.min(f.to, max));
+    out.focus = { from, to };
+  }
+
+  if (type === "tick") {
+    if (!Array.isArray(v.parts) || v.parts.length === 0) return null;
+    if (v.parts.length > SHEET_LIMITS.tickParts) return null;
+    const parts: TickPart[] = [];
+    for (const p of v.parts) {
+      const t = tickPart(p);
+      if (t === null) return null;
+      parts.push(t);
+    }
+    out.parts = parts;
+  }
+
+  return out;
 }
 
 /**

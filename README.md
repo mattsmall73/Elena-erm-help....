@@ -206,6 +206,42 @@ is told to leave out anything it is unsure of rather than guess, and that mostly
 holds. Where a wrong date costs marks, check a surprise against your notes. The
 sheet is a prompt, not gospel.
 
+### English Language papers
+
+**Add an English Language paper**, on the sheet list, turns one AQA Paper 1
+from her school booklet into a sheet. She chooses the booklet PDF and types the
+pages for one paper from its contents page, or photographs the pages. The
+browser cuts the PDF down to just those pages with `pdf-lib`, so an 87-page,
+15 MB booklet becomes about 1 MB and stays under Vercel's request limit.
+
+`/api/sheets/paper` reads it in two calls, so each stays well inside the
+function time limit: first the source, line by line as printed so line 9 in
+the app is line 9 in the booklet; then the questions, read against that
+numbered text. `lib/english-paper.ts` turns the result into five cards:
+
+- **Q1** tick boxes, checked in the browser as she picks. A wrong pick points
+  her at the line the answer is on and leaves the finding to her.
+- **Q2 to Q4** with the source beside the answer box, the lines the question
+  allows marked and the rest dimmed, and a read-aloud button using the
+  browser's own voice.
+- **Q5** writing, with the school's DROP, SHIFT, ZOOM, LEAVE planner as its
+  steps.
+
+The method steps are written once in `lib/english-paper.ts`, so they are the
+same on every paper. The model only supplies what changes: the source, the
+question wording, line numbers, tick-box answers and pointers into the text.
+
+Marking uses `lib/english-marking-prompt.ts`, chosen when the sheet's subject
+is English Language. It carries the History marker's eight rules and voice,
+plus two things only this paper needs: it checks every quote is in the source
+and inside the lines the question allows, and it gives spelling and
+punctuation feedback only on Q5, the one question with marks for it. Q5 shows
+its 24 and 16 separately.
+
+Nothing from the booklet is committed to this repository. The source text lives
+only inside her sheet in the database. No schema change was needed: the source
+rides inside the existing `questions` JSON.
+
 ## Privacy
 
 Single user — no accounts, no leaderboards against other people (the opponent is

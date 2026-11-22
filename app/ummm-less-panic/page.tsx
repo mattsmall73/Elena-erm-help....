@@ -17,7 +17,15 @@ import {
   runningGrade,
   type StoredMark,
 } from "@/lib/marking";
-import type { Question, Sheet, SheetSummary } from "@/lib/revision-db";
+import type { Question, Sheet, SheetSummary, Source } from "@/lib/revision-db";
+import SourcePanel from "@/components/SourcePanel";
+import { downscaleImage } from "@/lib/downscale-image";
+import {
+  ENGLISH_SUBJECT,
+  readTicks,
+  tickScore,
+  writeTicks,
+} from "@/lib/english-paper";
 
 const BATCH = 4; // questions sent to the model at a time
 
@@ -43,7 +51,57 @@ const countWords = (text: string): number => {
   return t ? t.split(/\s+/).length : 0;
 };
 
-type Screen = "sheets" | "create" | "pick" | "quiz" | "end";
+type Screen = "sheets" | "create" | "paper" | "pick" | "quiz" | "end";
+
+/** One page or photo ready to post: base64 without the data: prefix. */
+type PaperFile = { mediaType: string; data: string };
+
+/* The booklet is one big PDF. Only the pages for one paper are sent, cut out
+   in the browser, so a 15 MB, 87-page booklet becomes about 1 MB. */
+const MAX_PAPER_PAGES = 8;
+const MAX_PAPER_CHARS = 3_800_000;
+
+/** "10 to 13", "10-13", "10, 11, 12" or "10 11 12 13", as page numbers. */
+function parsePages(text: string, total: number): number[] | string {
+  const t = text
+    .toLowerCase()
+    .replace(/\bto\b/g, "-")
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\s*-\s*/g, "-")
+    .trim();
+  if (!t) return "Put in the page numbers for this paper.";
+  const out = new Set<number>();
+  for (const bit of t.split(/[\s,]+/).filter(Boolean)) {
+    const m = bit.match(/^(\d+)-(\d+)$/);
+    if (m) {
+      const a = Number(m[1]);
+      const b = Number(m[2]);
+      if (b < a) return "That page range runs backwards.";
+      for (let n = a; n <= b && out.size <= MAX_PAPER_PAGES; n++) out.add(n);
+    } else if (/^\d+$/.test(bit)) {
+      out.add(Number(bit));
+    } else {
+      return "Page numbers only, like 10 to 13.";
+    }
+  }
+  const pages = [...out].sort((a, b) => a - b);
+  if (pages.some((n) => n < 1 || n > total)) {
+    return `That booklet has ${total} pages.`;
+  }
+  if (pages.length > MAX_PAPER_PAGES) {
+    return `That is more than ${MAX_PAPER_PAGES} pages. The source and the question pages are enough.`;
+  }
+  return pages;
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
 
 interface Feedback {
   status: "marked" | "too_short";
@@ -60,6 +118,8 @@ interface Feedback {
   factualNotes?: string[];
   spelling?: { marksAvailable: number; fixes: string[] };
   markSchemeWording?: string;
+  /** English Language writing question: the two halves of the 40. */
+  split?: { content: number; accuracy: number } | null;
   previousMark?: number | null;
   previousLevel?: number | null;
 }
@@ -91,14 +151,17 @@ const label = "mb-2 block text-sm text-calm-soft";
    box and threw away the focus: typing 42 characters left one behind. */
 function Surface({
   error,
+  wide = false,
   children,
 }: {
   error: string | null;
+  /** Room for the source beside the question on a laptop screen. */
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <main className="calm-surface bg-calm-page text-calm-ink font-body min-h-screen px-5 py-10">
-      <div className="mx-auto w-full max-w-xl">
+      <div className={"mx-auto w-full " + (wide ? "max-w-6xl" : "max-w-xl")}>
         {error && (
           <p className="mb-5 border border-[#e6cfcf] bg-[#f7eded] px-4 py-3 text-sm text-[#8a3b3b]">
             {error}
@@ -142,6 +205,21 @@ export default function UmmmLessPanic() {
   const [openPanel, setOpenPanel] = useState<string>("");
   const [confirmDelete, setConfirmDelete] = useState<string>("");
   const [deleting, setDeleting] = useState(false);
+
+  /* Adding an English Language paper. The booklet file is kept between
+     papers, so adding the next one is only a change of page numbers. */
+  const [paperMode, setPaperMode] = useState<"pdf" | "photos">("pdf");
+  const [booklet, setBooklet] = useState<File | null>(null);
+  const [bookletPages, setBookletPages] = useState(0);
+  const [pageText, setPageText] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [paperName, setPaperName] = useState("");
+  const [readingPaper, setReadingPaper] = useState(false);
+  const [paperNote, setPaperNote] = useState("");
+  const readingPaperRef = useRef(false);
+
+  /* Where a tick-box answer is, once she has picked a wrong one. */
+  const [pointLine, setPointLine] = useState(0);
 
   const barRef = useRef<HTMLElement | null>(null);
   const stopMarkAll = useRef(false);
@@ -348,7 +426,7 @@ export default function UmmmLessPanic() {
 
     const queued = only ?? markableNow();
     const blank = sheet.questions.filter(
-      (_, i) => countWords(answers[i] ?? "") < MARK_MIN_WORDS,
+      (q, i) => q.type !== "tick" && countWords(answers[i] ?? "") < MARK_MIN_WORDS,
     ).length;
 
     if (queued.length === 0) {
@@ -482,6 +560,177 @@ export default function UmmmLessPanic() {
     await openSheet(saved.data.id);
   }
 
+  /* Opens the booklet once, to count its pages so a wrong page number can be
+     caught before anything is sent. pdf-lib is loaded only here, so nobody
+     downloads it who never adds a paper. */
+  async function chooseBooklet(file: File | null) {
+    setError("");
+    setPaperNote("");
+    if (!file) return;
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      const doc = await PDFDocument.load(await file.arrayBuffer(), {
+        ignoreEncryption: true,
+      });
+      setBooklet(file);
+      setBookletPages(doc.getPageCount());
+    } catch {
+      setBooklet(null);
+      setBookletPages(0);
+      setError("That file wouldn't open as a PDF. Try photos instead?");
+    }
+  }
+
+  /* The pages for one paper, ready to post. */
+  async function gatherPaperFiles(): Promise<PaperFile[] | string> {
+    if (paperMode === "pdf") {
+      if (!booklet) return "Choose the booklet first.";
+      const pages = parsePages(pageText, bookletPages);
+      if (typeof pages === "string") return pages;
+      const { PDFDocument } = await import("pdf-lib");
+      const whole = await PDFDocument.load(await booklet.arrayBuffer(), {
+        ignoreEncryption: true,
+      });
+      const cut = await PDFDocument.create();
+      const copied = await cut.copyPages(
+        whole,
+        pages.map((n) => n - 1),
+      );
+      copied.forEach((pg) => cut.addPage(pg));
+      const data = toBase64(await cut.save());
+      if (data.length > MAX_PAPER_CHARS) {
+        return "Those pages are too big to send together. Try fewer pages.";
+      }
+      return [{ mediaType: "application/pdf", data }];
+    }
+
+    if (photos.length === 0) return "Add photos of the pages first.";
+    if (photos.length > MAX_PAPER_PAGES) {
+      return `That is more than ${MAX_PAPER_PAGES} photos. The source and the question pages are enough.`;
+    }
+    const out: PaperFile[] = [];
+    let total = 0;
+    for (const f of photos) {
+      const shrunk = await downscaleImage(f);
+      if (!shrunk.ok) return shrunk.reason;
+      const data = shrunk.dataUrl.slice(shrunk.dataUrl.indexOf(",") + 1);
+      total += data.length;
+      out.push({ mediaType: "image/jpeg", data });
+    }
+    if (total > MAX_PAPER_CHARS) {
+      return "Those photos are too big to send together. Try fewer, or crop them.";
+    }
+    return out;
+  }
+
+  /* Reads one English Language paper into a sheet.
+
+     Two calls: the source first, then the questions read against it. Guarded
+     with a ref as well as state, because a second press landing before the
+     re-render would read the paper twice and pay for it twice. */
+  async function readPaper() {
+    if (readingPaperRef.current) return;
+    readingPaperRef.current = true;
+    setReadingPaper(true);
+    setError("");
+    setPaperNote("");
+
+    try {
+      setPaperNote("Getting the pages ready");
+      const files = await gatherPaperFiles();
+      if (typeof files === "string") {
+        setError(files);
+        return;
+      }
+
+      setPaperNote("Reading the source. About half a minute.");
+      const srcRes = await fetch("/api/sheets/paper", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ step: "source", files }),
+      });
+      const src = await readResponse<{ paperName: string; source: Source }>(srcRes);
+      if (!src.ok) {
+        setError(src.error);
+        return;
+      }
+
+      setPaperNote(
+        `Got the source, ${src.data.source.lines.length} lines. Now the questions. About a minute.`,
+      );
+      const qRes = await fetch("/api/sheets/paper", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          step: "questions",
+          files,
+          source: src.data.source,
+          paperName: src.data.paperName,
+        }),
+      });
+      const qs = await readResponse<{ questions: Question[] }>(qRes);
+      if (!qs.ok) {
+        setError(qs.error + " Nothing was saved.");
+        return;
+      }
+
+      setPaperNote("Saving it");
+      const title =
+        paperName.trim() || src.data.paperName.trim() || "English Language paper";
+      const saveRes = await fetch("/api/sheets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title,
+          subject: ENGLISH_SUBJECT,
+          questions: qs.data.questions,
+        }),
+      });
+      const saved = await readResponse<{ id: string }>(saveRes);
+      if (!saved.ok) {
+        setError(saved.error);
+        return;
+      }
+
+      // The booklet stays chosen, so the next paper is just new page numbers.
+      setPageText("");
+      setPhotos([]);
+      setPaperName("");
+      setPaperNote("");
+      await loadSheets();
+      await openSheet(saved.data.id);
+    } catch {
+      setError("Couldn't read that paper. Check your connection and try again?");
+    } finally {
+      readingPaperRef.current = false;
+      setReadingPaper(false);
+    }
+  }
+
+  /* Whether a question has anything in it. A tick-box answer is a stored list
+     of choices, which reads as one "word" even when nothing is picked. */
+  function hasAnswer(i: number): boolean {
+    const q = sheet?.questions[i];
+    const a = answers[i] ?? "";
+    if (q?.type === "tick") {
+      return readTicks(a, q.parts?.length ?? 0).some((t) => t !== null);
+    }
+    return a.trim().length > 0;
+  }
+
+  /* A tick-box pick. Saved like any answer, checked straight away in the
+     page. A wrong pick points at the line the answer is on rather than giving
+     the answer, so finding it is still hers. */
+  function pickTick(idx: number, part: number, option: number) {
+    const q = sheet?.questions[idx];
+    if (!q || q.type !== "tick" || !q.parts) return;
+    const ticks = readTicks(answers[idx] ?? "", q.parts.length);
+    ticks[part] = option;
+    onType(writeTicks(ticks));
+    const p = q.parts[part];
+    setPointLine(p.correct >= 0 && option !== p.correct && p.line > 0 ? p.line : 0);
+  }
+
   function startRun(kind: string) {
     if (!sheet) return;
     const all = sheet.questions.map((_, i) => i);
@@ -495,10 +744,10 @@ export default function UmmmLessPanic() {
       }
       picked = pool.slice(0, 3);
     } else if (kind === "unanswered") {
-      picked = all.filter((i) => !(answers[i] ?? "").trim());
+      picked = all.filter((i) => !hasAnswer(i));
     } else if (kind === "flagged") {
       picked = all.filter((i) => flags[i]);
-    } else if (["short", "long", "judge"].includes(kind)) {
+    } else if (["short", "long", "judge", "tick", "write"].includes(kind)) {
       picked = all.filter((i) => sheet.questions[i].type === kind);
     } else {
       picked = all;
@@ -561,6 +810,7 @@ export default function UmmmLessPanic() {
     setPos(next);
     setHintsShown(0);
     setOpenPanel("");
+    setPointLine(0);
     window.scrollTo({ top: 0 });
   }
 
@@ -594,6 +844,7 @@ export default function UmmmLessPanic() {
       }
     }
     setHintsShown(0);
+    setPointLine(0);
     flushSave();
     if (pos + 1 >= queue.length) setScreen("end");
     else setPos(pos + 1);
@@ -604,7 +855,17 @@ export default function UmmmLessPanic() {
     if (!sheet) return;
     const written = sheet.questions
       .map((q, i) => ({ q, i }))
-      .filter(({ i }) => (answers[i] ?? "").trim());
+      .filter(({ i }) => hasAnswer(i));
+
+    /* A tick-box answer is stored as a list of choices; the export shows the
+       options she picked, in words. */
+    const answerText = (q: Question, i: number): string => {
+      if (q.type !== "tick" || !q.parts) return (answers[i] ?? "").trim();
+      const ticks = readTicks(answers[i] ?? "", q.parts.length);
+      return q.parts
+        .map((p, n) => `${p.prompt}  ${ticks[n] === null ? "(not answered)" : p.options[ticks[n]!]}`)
+        .join("\n");
+    };
 
     if (written.length === 0) {
       setError("Nothing written yet.");
@@ -626,7 +887,7 @@ export default function UmmmLessPanic() {
         <p class="lab">${esc(q.label)}</p>
         <p class="q">${esc(q.prompt)}</p>
         ${q.given ? `<p class="g">${esc(q.given)}</p>` : ""}
-        <div class="a">${esc((answers[i] ?? "").trim())}</div>
+        <div class="a">${esc(answerText(q, i))}</div>
         <div class="mark"><span>Marks</span><span>Comment</span></div>
       </section>`
       )
@@ -763,15 +1024,27 @@ section{margin-bottom:2rem;page-break-inside:avoid}
           )}
         </div>
 
-        <button
-          className={btnSolid}
-          onClick={() => {
-            setError("");
-            setScreen("create");
-          }}
-        >
-          Make a new sheet
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            className={btnSolid}
+            onClick={() => {
+              setError("");
+              setScreen("create");
+            }}
+          >
+            Make a new sheet
+          </button>
+          <button
+            className={btnQuiet}
+            onClick={() => {
+              setError("");
+              setPaperNote("");
+              setScreen("paper");
+            }}
+          >
+            Add an English Language paper
+          </button>
+        </div>
 
         {seedNote && (
           <p className="text-calm-moss mt-4 text-sm" role="status">
@@ -865,10 +1138,146 @@ section{margin-bottom:2rem;page-break-inside:avoid}
     );
   }
 
+  if (screen === "paper") {
+    return (
+      <Surface error={error}>
+        <button
+          onClick={() => setScreen("sheets")}
+          className={btnBack + " mb-4 block"}
+          disabled={readingPaper}
+        >
+          back to sheets
+        </button>
+        <h1 className={h1}>Add an English Language paper</h1>
+        <p className={lede}>
+          One paper from your booklet at a time. It reads the source with its line
+          numbers and the questions, and makes a sheet you can type into and get marked.
+        </p>
+
+        <div className="mb-5 flex gap-2" role="radiogroup" aria-label="Where the paper comes from">
+          {(
+            [
+              ["pdf", "From the booklet PDF"],
+              ["photos", "From photos"],
+            ] as const
+          ).map(([mode, text]) => (
+            <button
+              key={mode}
+              role="radio"
+              aria-checked={paperMode === mode}
+              disabled={readingPaper}
+              onClick={() => setPaperMode(mode)}
+              className={
+                "rounded-sm border px-4 py-2 text-sm " +
+                (paperMode === mode
+                  ? "border-calm-ink bg-calm-ink text-calm-card"
+                  : "border-calm-line text-calm-soft hover:border-calm-soft hover:text-calm-ink")
+              }
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+
+        {paperMode === "pdf" ? (
+          <>
+            <label className={label} htmlFor="booklet">
+              The booklet
+            </label>
+            <input
+              id="booklet"
+              type="file"
+              accept="application/pdf,.pdf"
+              disabled={readingPaper}
+              onChange={(e) => void chooseBooklet(e.target.files?.[0] ?? null)}
+              className="text-calm-soft file:border-calm-line file:text-calm-ink mb-1 block text-sm file:mr-3 file:rounded-sm file:border file:bg-white file:px-3 file:py-2"
+            />
+            {booklet && (
+              <p className="text-calm-soft mb-4 text-sm">
+                {booklet.name}, {bookletPages} pages.
+              </p>
+            )}
+
+            <label className={label + " mt-4"} htmlFor="pages">
+              Which pages
+            </label>
+            <input
+              id="pages"
+              className={field + " max-w-xs"}
+              value={pageText}
+              disabled={readingPaper}
+              onChange={(e) => setPageText(e.target.value)}
+              placeholder="10 to 13"
+              inputMode="numeric"
+            />
+            <p className="text-calm-soft mt-2 text-sm">
+              The contents page lists them. You need the source page and the question
+              pages. Leaving out the example answers makes it quicker.
+            </p>
+          </>
+        ) : (
+          <>
+            <label className={label} htmlFor="photos">
+              Photos of the pages
+            </label>
+            <input
+              id="photos"
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={readingPaper}
+              onChange={(e) => setPhotos(Array.from(e.target.files ?? []))}
+              className="text-calm-soft file:border-calm-line file:text-calm-ink block text-sm file:mr-3 file:rounded-sm file:border file:bg-white file:px-3 file:py-2"
+            />
+            <p className="text-calm-soft mt-2 text-sm">
+              {photos.length > 0
+                ? `${photos.length} photo${photos.length === 1 ? "" : "s"} chosen. `
+                : ""}
+              The source page and the question pages. Flat and straight on works best.
+            </p>
+          </>
+        )}
+
+        <label className={label + " mt-5"} htmlFor="papername">
+          Name for the sheet, if you want to choose one
+        </label>
+        <input
+          id="papername"
+          className={field}
+          value={paperName}
+          disabled={readingPaper}
+          onChange={(e) => setPaperName(e.target.value)}
+          placeholder="It will use the paper's own name, like June 2017 · Rosabel"
+        />
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <button
+            className={btnSolid}
+            disabled={readingPaper}
+            onClick={() => void readPaper()}
+          >
+            {readingPaper ? "Reading it" : "Read this paper"}
+          </button>
+        </div>
+        {paperNote && (
+          <p className="text-calm-soft mt-3 text-sm" role="status">
+            {paperNote}
+          </p>
+        )}
+        {!readingPaper && (
+          <p className="text-calm-soft mt-6 text-sm">
+            Reading a paper costs about 25p. Check the first lines of the source
+            against your booklet when it opens.
+          </p>
+        )}
+      </Surface>
+    );
+  }
+
   if (screen === "pick" && sheet) {
-    const counts: Record<string, number> = { short: 0, long: 0, judge: 0 };
+    const counts: Record<string, number> = { short: 0, long: 0, judge: 0, tick: 0, write: 0 };
     sheet.questions.forEach((q) => (counts[q.type] = (counts[q.type] ?? 0) + 1));
-    const unanswered = sheet.questions.filter((_, i) => !(answers[i] ?? "").trim()).length;
+    const unanswered = sheet.questions.filter((_, i) => !hasAnswer(i)).length;
     const flagged = Object.keys(flags).length;
 
     return (
@@ -910,6 +1319,8 @@ section{margin-bottom:2rem;page-break-inside:avoid}
           {counts.short > 0 && <Choice n={counts.short} t="Short answers" d="The quick ones." onClick={() => startRun("short")} />}
           {counts.long > 0 && <Choice n={counts.long} t="Extended answers" d="The ones that need paragraphs." onClick={() => startRun("long")} />}
           {counts.judge > 0 && <Choice n={counts.judge} t="How far do you agree" d="Both sides, then a verdict." onClick={() => startRun("judge")} />}
+          {counts.tick > 0 && <Choice n={counts.tick} t="Tick boxes" d="Find it in the text. Checked as you pick." onClick={() => startRun("tick")} />}
+          {counts.write > 0 && <Choice n={counts.write} t="Writing" d="Your own description or story." onClick={() => startRun("write")} />}
           <Choice n={sheet.questions.length} t="Everything" d="In order." onClick={() => startRun("all")} />
         </div>
       </Surface>
@@ -922,8 +1333,12 @@ section{margin-bottom:2rem;page-break-inside:avoid}
     const text = answers[idx] ?? "";
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
 
+    const english = !!q.source || sheet.subject === ENGLISH_SUBJECT;
+    const ticks = q.type === "tick" ? readTicks(text, q.parts?.length ?? 0) : [];
+    const tickResult = q.type === "tick" && q.parts ? tickScore(q.parts, ticks) : null;
+
     return (
-      <Surface error={error}>
+      <Surface error={error} wide={!!q.source}>
         <nav
           ref={barRef}
           aria-label="The questions in this run"
@@ -945,7 +1360,7 @@ section{margin-bottom:2rem;page-break-inside:avoid}
             const p = pillState({
               isCurrent: n === pos,
               isParked: !!flags[qi],
-              hasWords: countWords(answers[qi] ?? "") > 0,
+              hasWords: hasAnswer(qi),
               isMarked: !!marks[qi],
             });
             return (
@@ -1015,11 +1430,97 @@ section{margin-bottom:2rem;page-break-inside:avoid}
           </button>
         </div>
 
+        <div
+          className={
+            q.source
+              ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]"
+              : ""
+          }
+        >
+        {q.source && (
+          <div className="lg:sticky lg:top-4">
+            <SourcePanel source={q.source} focus={q.focus} pointLine={pointLine || undefined} />
+          </div>
+        )}
+        <div>
         <div className="border-calm-line bg-calm-card border p-6 sm:p-8">
           <p className="text-calm-plum mb-3 text-sm">{q.label}</p>
-          <h2 className="font-read mb-5 text-2xl leading-snug font-normal">{q.prompt}</h2>
-          {q.given && <p className="font-read text-calm-soft mb-5 italic">{q.given}</p>}
+          <h2 className="font-read mb-5 text-2xl leading-snug font-normal whitespace-pre-line">
+            {q.prompt}
+          </h2>
+          {/* Not italic on an English sheet: slanted text is harder to read
+              with dyslexia, and these lines carry instructions she needs. */}
+          {q.given && (
+            <p className={"font-read text-calm-soft mb-5 " + (english ? "" : "italic")}>
+              {q.given}
+            </p>
+          )}
 
+          {q.type === "tick" && q.parts ? (
+            <div>
+              {q.parts.map((part, n) => {
+                const picked = ticks[n];
+                const checked = part.correct >= 0 && picked !== null;
+                const right = checked && picked === part.correct;
+                return (
+                  <div
+                    key={n}
+                    role="group"
+                    aria-labelledby={`tick-${idx}-${n}`}
+                    className="border-calm-line mt-5 border-t pt-4 first:mt-0 first:border-t-0 first:pt-0"
+                  >
+                    <p id={`tick-${idx}-${n}`} className="font-read mb-3 text-lg">
+                      {part.prompt}
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {part.options.map((opt, o) => {
+                        const isPicked = picked === o;
+                        return (
+                          <button
+                            key={o}
+                            type="button"
+                            aria-pressed={isPicked}
+                            onClick={() => pickTick(idx, n, o)}
+                            className={
+                              "rounded-sm border px-4 py-3 text-left " +
+                              (isPicked
+                                ? right
+                                  ? "border-calm-moss bg-[#e7f0ea] text-calm-ink"
+                                  : checked
+                                    ? "border-calm-plum bg-[#f3f0f5] text-calm-ink"
+                                    : "border-calm-ink bg-white text-calm-ink"
+                                : "border-calm-line hover:border-calm-soft bg-white text-calm-ink")
+                            }
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {picked !== null && (
+                      <p className={"mt-2 text-sm " + (right ? "text-calm-moss" : "text-calm-soft")} role="status">
+                        {part.correct < 0
+                          ? "Saved. This one could not be checked against the paper."
+                          : right
+                            ? part.line > 0
+                              ? `Yes. It is in line ${part.line}.`
+                              : "Yes."
+                            : part.line > 0
+                              ? `Not that one. Have another look at line ${part.line}, it is marked in the source.`
+                              : "Not that one. Have another look at the marked lines."}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+              {tickResult && tickResult.answered === (q.parts?.length ?? 0) && tickResult.checkable > 0 && (
+                <p className="font-read border-calm-line mt-6 border-t pt-4 text-xl">
+                  {tickResult.right} out of {tickResult.checkable}.
+                </p>
+              )}
+            </div>
+          ) : (
+          <>
           {q.shape.length > 0 && (
             <ol className="border-calm-line text-calm-soft border-l-2 pl-5 text-sm">
               {q.shape.map((s, i) => (
@@ -1067,24 +1568,33 @@ section{margin-bottom:2rem;page-break-inside:avoid}
             </label>
             <textarea
               id="answer"
-              rows={q.type === "short" ? 5 : q.type === "long" ? 10 : 13}
+              rows={q.type === "short" ? 5 : q.type === "long" ? 10 : q.type === "write" ? 18 : 13}
               value={text}
               onChange={(e) => onType(e.target.value)}
               className={field + " font-read resize-y leading-relaxed"}
               placeholder={
                 q.type === "short"
                   ? "Two sentences is enough."
-                  : q.type === "judge"
-                    ? "Both sides, then say which mattered most."
-                    : "Start wherever you can."
+                  : q.type === "write"
+                    ? "Say which task you chose in your first line, then start with DROP."
+                    : q.type === "judge"
+                      ? english
+                        ? "Say how far you agree first. Then your reasons, each with a short quote."
+                        : "Both sides, then say which mattered most."
+                      : english
+                        ? "Start with a short quote from the marked lines."
+                        : "Start wherever you can."
               }
             />
             <div className="text-calm-soft mt-1.5 text-right text-sm">
               {words === 1 ? "1 word" : words + " words"}
             </div>
           </div>
+          </>
+          )}
         </div>
 
+        {q.type !== "tick" && (
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
             className={btnQuiet}
@@ -1103,6 +1613,7 @@ section{margin-bottom:2rem;page-break-inside:avoid}
                 : "mark this"}
           </button>
         </div>
+        )}
 
         {marks[idx] && (
           <MarkPanel
@@ -1138,13 +1649,15 @@ section{margin-bottom:2rem;page-break-inside:avoid}
             Done
           </button>
         </div>
+        </div>
+        </div>
       </Surface>
     );
   }
 
   if (screen === "end" && sheet) {
     const flaggedNow = queue.filter((i) => flags[i]);
-    const written = queue.filter((i) => (answers[i] ?? "").trim());
+    const written = queue.filter((i) => hasAnswer(i));
 
     return (
       <Surface error={error}>
@@ -1403,6 +1916,13 @@ function MarkPanel({
         <p className="text-calm-soft mt-2 text-sm">{fb.levelWording}</p>
       )}
 
+      {fb.split && (
+        <p className="text-calm-ink mt-2 text-sm">
+          Content and organisation {fb.split.content} out of 24. Spelling and
+          punctuation {fb.split.accuracy} out of 16.
+        </p>
+      )}
+
       {moved && (
         <p className="text-calm-moss mt-3 text-sm font-medium">{moved}</p>
       )}
@@ -1483,10 +2003,14 @@ function MarkPanel({
             onClick={() => toggle("spelling")}
           >
             {openPanel === "spelling"
-              ? "hide spelling"
+              ? fb.split
+                ? "hide spelling and punctuation"
+                : "hide spelling"
               : fb.spelling!.marksAvailable > 0
-                ? `spelling: ${fb.spelling!.marksAvailable} mark${fb.spelling!.marksAvailable === 1 ? "" : "s"} available`
-                : "spelling"}
+                ? `${fb.split ? "spelling and punctuation" : "spelling"}: ${fb.spelling!.marksAvailable} mark${fb.spelling!.marksAvailable === 1 ? "" : "s"} available`
+                : fb.split
+                  ? "spelling and punctuation"
+                  : "spelling"}
           </button>
           {openPanel === "spelling" && (
             <ul className="mt-2 list-disc pl-5 text-sm">
