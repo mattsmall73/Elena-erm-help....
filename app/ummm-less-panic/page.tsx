@@ -19,6 +19,7 @@ import {
 } from "@/lib/marking";
 import type { Question, Sheet, SheetSummary } from "@/lib/revision-db";
 import SourcePanel from "@/components/SourcePanel";
+import { useSpeech, paragraphs, SPEAKING, type Chunk, type Speech } from "@/lib/use-speech";
 import { downscaleImage } from "@/lib/downscale-image";
 import {
   ENGLISH_SUBJECT,
@@ -221,6 +222,9 @@ export default function UmmmLessPanic() {
   /* The open sheet's source pages, as data: URLs, for English papers. */
   const [sourcePages, setSourcePages] = useState<string[]>([]);
 
+  /* Read aloud, for the question, the hints and the feedback. */
+  const speech = useSpeech();
+
   const barRef = useRef<HTMLElement | null>(null);
   const stopMarkAll = useRef(false);
   /* Synchronous, unlike the markingAll state behind it. Two presses landing
@@ -397,6 +401,7 @@ export default function UmmmLessPanic() {
 
   async function markAnswer(idx: number) {
     if (!sheet || marking || markingAll) return;
+    speech.stop();
     setMarking(true);
     setError("");
     setOpenPanel("");
@@ -815,6 +820,7 @@ export default function UmmmLessPanic() {
      decision; Done moves on and clears a park, and nothing else. */
   function goTo(next: number) {
     if (next === pos || next < 0 || next >= queue.length) return;
+    speech.stop();
     flushSave();
     setPos(next);
     setHintsShown(0);
@@ -834,6 +840,7 @@ export default function UmmmLessPanic() {
   }
 
   function advance(flagIt: boolean) {
+    speech.stop();
     const idx = queue[pos];
     if (flagIt) {
       setFlags((f) => ({ ...f, [idx]: true }));
@@ -1431,7 +1438,13 @@ section{margin-bottom:2rem;page-break-inside:avoid}
               </button>
             )}
           </div>
-          <button onClick={() => setScreen("pick")} className={btnBack}>
+          <button
+            onClick={() => {
+              speech.stop();
+              setScreen("pick");
+            }}
+            className={btnBack}
+          >
             stop for now
           </button>
         </div>
@@ -1450,14 +1463,42 @@ section{margin-bottom:2rem;page-break-inside:avoid}
         )}
         <div>
         <div className="border-calm-line bg-calm-card border p-6 sm:p-8">
-          <p className="text-calm-plum mb-3 text-sm">{q.label}</p>
-          <h2 className="font-read mb-5 text-2xl leading-snug font-normal whitespace-pre-line">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-calm-plum text-sm">{q.label}</p>
+            <Listen
+              speech={speech}
+              name="question"
+              label="Read the question to me"
+              chunks={() => [
+                { id: "q-prompt", text: q.prompt },
+                ...(q.given ? [{ id: "q-given", text: q.given }] : []),
+                ...(q.type === "tick" && q.parts
+                  ? q.parts.map((p, i) => ({
+                      id: `q-part-${i}`,
+                      text: `${p.prompt} ${p.options.join(", or ")}.`,
+                    }))
+                  : q.shape.map((st, i) => ({ id: `q-step-${i}`, text: st }))),
+              ]}
+            />
+          </div>
+          <h2
+            className={
+              "font-read mb-5 text-2xl leading-snug font-normal whitespace-pre-line " +
+              (speech.current === "q-prompt" ? SPEAKING : "")
+            }
+          >
             {q.prompt}
           </h2>
           {/* Not italic on an English sheet: slanted text is harder to read
               with dyslexia, and these lines carry instructions she needs. */}
           {q.given && (
-            <p className={"font-read text-calm-soft mb-5 " + (english ? "" : "italic")}>
+            <p
+              className={
+                "font-read text-calm-soft mb-5 " +
+                (english ? "" : "italic ") +
+                (speech.current === "q-given" ? SPEAKING : "")
+              }
+            >
               {q.given}
             </p>
           )}
@@ -1475,7 +1516,13 @@ section{margin-bottom:2rem;page-break-inside:avoid}
                     aria-labelledby={`tick-${idx}-${n}`}
                     className="border-calm-line mt-5 border-t pt-4 first:mt-0 first:border-t-0 first:pt-0"
                   >
-                    <p id={`tick-${idx}-${n}`} className="font-read mb-3 text-lg">
+                    <p
+                      id={`tick-${idx}-${n}`}
+                      className={
+                        "font-read mb-3 text-lg " +
+                        (speech.current === `q-part-${n}` ? SPEAKING : "")
+                      }
+                    >
                       {part.prompt}
                     </p>
                     <div className="flex flex-col gap-2">
@@ -1530,7 +1577,12 @@ section{margin-bottom:2rem;page-break-inside:avoid}
           {q.shape.length > 0 && (
             <ol className="border-calm-line text-calm-soft border-l-2 pl-5 text-sm">
               {q.shape.map((s, i) => (
-                <li key={i} className="my-1.5 list-decimal">
+                <li
+                  key={i}
+                  className={
+                    "my-1.5 list-decimal " + (speech.current === `q-step-${i}` ? SPEAKING : "")
+                  }
+                >
                   {s}
                 </li>
               ))}
@@ -1546,12 +1598,25 @@ section{margin-bottom:2rem;page-break-inside:avoid}
               </button>
             ) : (
               <div className="mt-4 border border-[#e3dde8] bg-[#f3f0f5] px-4 py-4">
-                <p className="text-calm-plum mb-2 text-sm">
-                  Things you could use. You do not need all of them.
-                </p>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-calm-plum text-sm">
+                    Things you could use. You do not need all of them.
+                  </p>
+                  <Listen
+                    speech={speech}
+                    name="hints"
+                    label="Read these to me"
+                    chunks={() =>
+                      q.hints.slice(0, hintsShown).map((h, i) => ({ id: `hint-${i}`, text: h }))
+                    }
+                  />
+                </div>
                 <ul className="list-disc pl-4 text-sm">
                   {q.hints.slice(0, hintsShown).map((h, i) => (
-                    <li key={i} className="my-1.5">
+                    <li
+                      key={i}
+                      className={"my-1.5 " + (speech.current === `hint-${i}` ? SPEAKING : "")}
+                    >
                       {h}
                     </li>
                   ))}
@@ -1623,6 +1688,7 @@ section{margin-bottom:2rem;page-break-inside:avoid}
 
         {marks[idx] && (
           <MarkPanel
+            speech={speech}
             record={marks[idx]}
             openPanel={openPanel}
             setOpenPanel={setOpenPanel}
@@ -1874,12 +1940,30 @@ function GradeStrip({
    blank line between each. In one <p> those blank lines collapse to a space, so
    the model would obey the rule and the screen would still show a block. Nothing
    would fail; it would just quietly not work. */
-function Paragraphs({ text, className = "" }: { text: string; className?: string }) {
-  const paras = text.split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean);
+function Paragraphs({
+  text,
+  className = "",
+  id,
+  current,
+}: {
+  text: string;
+  className?: string;
+  /** Prefix for read-aloud ids: paragraph i is `${id}-${i}`. */
+  id?: string;
+  current?: string | null;
+}) {
+  const paras = paragraphs(text);
   return (
     <>
       {paras.map((t, i) => (
-        <p key={i} className={className + (i > 0 ? " mt-3" : "")}>
+        <p
+          key={i}
+          className={
+            className +
+            (i > 0 ? " mt-3" : "") +
+            (id && current === `${id}-${i}` ? " " + SPEAKING : "")
+          }
+        >
           {t}
         </p>
       ))}
@@ -1887,11 +1971,50 @@ function Paragraphs({ text, className = "" }: { text: string; className?: string
   );
 }
 
+/** Paragraph chunks for read-aloud, with the ids Paragraphs gives them. */
+function paraChunks(id: string, text: string | undefined): Chunk[] {
+  return text ? paragraphs(text).map((t, i) => ({ id: `${id}-${i}`, text: t })) : [];
+}
+
+/* The read-aloud button. Turns into "Stop reading" only for the thing it
+   started, and is absent where the browser has no voice. */
+function Listen({
+  speech,
+  name,
+  label,
+  chunks,
+}: {
+  speech: Speech;
+  name: string;
+  label: string;
+  /** Built on press, so it reads what is on screen at that moment. */
+  chunks: () => Chunk[];
+}) {
+  if (!speech.supported) return null;
+  const active = speech.group === name;
+  return (
+    <button
+      type="button"
+      onClick={() => (active ? speech.stop() : speech.say(name, chunks()))}
+      className={
+        "rounded-sm border px-3 py-1 text-sm " +
+        (active
+          ? "border-calm-ink bg-calm-ink text-calm-card"
+          : "border-calm-line text-calm-soft hover:border-calm-soft hover:text-calm-ink")
+      }
+    >
+      {active ? "Stop reading" : label}
+    </button>
+  );
+}
+
 function MarkPanel({
+  speech,
   record,
   openPanel,
   setOpenPanel,
 }: {
+  speech: Speech;
   record: MarkRecord;
   openPanel: string;
   setOpenPanel: (p: string) => void;
@@ -1914,52 +2037,99 @@ function MarkPanel({
   });
   const moved = movement({ mark: record.mark, previousMark: record.previousMark });
   const toggle = (key: string) => setOpenPanel(openPanel === key ? "" : key);
+  const now = speech.current;
+  const hi = (id: string) => (now === id ? " " + SPEAKING : "");
+  const splitText = fb.split
+    ? `Content and organisation ${fb.split.content} out of 24. Spelling and punctuation ${fb.split.accuracy} out of 16.`
+    : "";
+
+  /* What gets read, in the order it sits on screen. The collapsed panels are
+     read only when she has opened them, so it reads what she can see. */
+  const chunks = (): Chunk[] => [
+    ...(line ? [{ id: "fb-line", text: line }] : []),
+    ...(fb.levelWording ? [{ id: "fb-level", text: fb.levelWording }] : []),
+    ...(splitText ? [{ id: "fb-split", text: splitText }] : []),
+    ...(moved ? [{ id: "fb-moved", text: moved }] : []),
+    ...(fb.workingWell
+      ? [{ id: "fb-hw", text: "Working." }, ...paraChunks("fb-work", fb.workingWell)]
+      : []),
+    ...(fb.oneChange?.observation
+      ? [
+          { id: "fb-hc", text: "Change this." },
+          ...paraChunks("fb-obs", fb.oneChange.observation),
+          ...paraChunks("fb-why", fb.oneChange.why),
+          ...(fb.oneChange.task ? [{ id: "fb-task", text: `Try this. ${fb.oneChange.task}` }] : []),
+        ]
+      : []),
+    ...(fb.factualNotes ?? []).map((n, i) => ({ id: `fb-fact-${i}`, text: n })),
+    ...(openPanel === "also"
+      ? (fb.alsoAvailable ?? []).map((t, i) => ({ id: `fb-also-${i}`, text: t }))
+      : []),
+    ...(openPanel === "spelling"
+      ? (fb.spelling?.fixes ?? []).map((t, i) => ({ id: `fb-spell-${i}`, text: t }))
+      : []),
+  ];
 
   return (
     <div className="border-calm-line bg-calm-card mt-5 border px-4 py-4">
-      {line && <p className="font-read text-calm-ink text-xl">{line}</p>}
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        {line && <p className={"font-read text-calm-ink text-xl" + hi("fb-line")}>{line}</p>}
+        <Listen speech={speech} name="feedback" label="Read this to me" chunks={chunks} />
+      </div>
       {fb.levelWording && (
-        <p className="text-calm-soft mt-2 text-sm">{fb.levelWording}</p>
+        <p className={"text-calm-soft mt-2 text-sm" + hi("fb-level")}>{fb.levelWording}</p>
       )}
 
       {fb.split && (
-        <p className="text-calm-ink mt-2 text-sm">
+        <p className={"text-calm-ink mt-2 text-sm" + hi("fb-split")}>
           Content and organisation {fb.split.content} out of 24. Spelling and
           punctuation {fb.split.accuracy} out of 16.
         </p>
       )}
 
       {moved && (
-        <p className="text-calm-moss mt-3 text-sm font-medium">{moved}</p>
+        <p className={"text-calm-moss mt-3 text-sm font-medium" + hi("fb-moved")}>{moved}</p>
       )}
 
       {fb.workingWell && (
         <div className="mt-4">
-          <h3 className="text-calm-plum mb-1 text-sm font-medium">Working</h3>
+          <h3 className={"text-calm-plum mb-1 text-sm font-medium" + hi("fb-hw")}>Working</h3>
           <Paragraphs
             text={fb.workingWell}
             className="text-calm-ink text-sm leading-relaxed"
+            id="fb-work"
+            current={now}
           />
         </div>
       )}
 
       {fb.oneChange?.observation && (
         <div className="mt-4">
-          <h3 className="text-calm-plum mb-1 text-sm font-medium">Change this</h3>
+          <h3 className={"text-calm-plum mb-1 text-sm font-medium" + hi("fb-hc")}>
+            Change this
+          </h3>
           <Paragraphs
             text={fb.oneChange.observation}
             className="text-calm-ink text-sm leading-relaxed"
+            id="fb-obs"
+            current={now}
           />
           {fb.oneChange.why && (
             <div className="mt-3">
               <Paragraphs
                 text={fb.oneChange.why}
                 className="text-calm-ink text-sm leading-relaxed"
+                id="fb-why"
+                current={now}
               />
             </div>
           )}
           {fb.oneChange.task && (
-            <p className="border-calm-plum/40 text-calm-ink mt-3 border-l-2 pl-3 text-sm">
+            <p
+              className={
+                "border-calm-plum/40 text-calm-ink mt-3 border-l-2 pl-3 text-sm" + hi("fb-task")
+              }
+            >
               Try this: {fb.oneChange.task}
             </p>
           )}
@@ -1970,7 +2140,7 @@ function MarkPanel({
       {(fb.factualNotes?.length ?? 0) > 0 && (
         <ul className="text-calm-soft mt-4 list-disc pl-5 text-sm">
           {fb.factualNotes!.map((n, i) => (
-            <li key={i} className="my-1">
+            <li key={i} className={"my-1" + hi(`fb-fact-${i}`)}>
               {n}
             </li>
           ))}
@@ -1991,7 +2161,7 @@ function MarkPanel({
           {openPanel === "also" && (
             <ul className="mt-2 list-disc pl-5 text-sm">
               {fb.alsoAvailable!.map((a, i) => (
-                <li key={i} className="text-calm-ink my-1.5 leading-relaxed">
+                <li key={i} className={"text-calm-ink my-1.5 leading-relaxed" + hi(`fb-also-${i}`)}>
                   {a}
                 </li>
               ))}
@@ -2021,7 +2191,7 @@ function MarkPanel({
           {openPanel === "spelling" && (
             <ul className="mt-2 list-disc pl-5 text-sm">
               {fb.spelling!.fixes.map((f, i) => (
-                <li key={i} className="text-calm-ink my-1.5">
+                <li key={i} className={"text-calm-ink my-1.5" + hi(`fb-spell-${i}`)}>
                   {f}
                 </li>
               ))}
